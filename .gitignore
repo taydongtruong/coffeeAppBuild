@@ -1,0 +1,15 @@
+# Python / Flask
+__pycache__/
+*.pyc
+.env
+venv/
+
+# Database
+*.db
+
+# Node / React
+node_modules/
+build/
+dist/
+npm-debug.log
+.DS_Store
