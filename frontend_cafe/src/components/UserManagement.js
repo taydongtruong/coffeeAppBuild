@@ -1,59 +1,66 @@
-// src/components/UserManagement.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './Menu.css';
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [isError, setIsError] = useState(false);
     const navigate = useNavigate();
+    
     const token = localStorage.getItem('access_token');
     const userRole = localStorage.getItem('user_role');
 
-    // State cho Form tạo người dùng mới
     const [newUser, setNewUser] = useState({
         username: '',
         password: '',
         full_name: '',
-        role: 'staff' // Mặc định là staff
+        role: 'staff'
     });
 
     useEffect(() => {
+        // Bảo mật lớp Frontend
         if (!token || userRole !== 'manager') {
             navigate('/');
             return;
         }
-        // Vì chúng ta chưa có API GET /api/users, nên chúng ta sẽ không fetch ban đầu
-        // Tạm thời chỉ hiển thị form tạo user.
-        // Tuy nhiên, nếu có API, bạn sẽ gọi fetchUsers ở đây.
-        // Giả sử chỉ có admin_cafe là user ban đầu.
-        setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        fetchUsers();
     }, [token, navigate, userRole]);
 
-    // Hàm gọi API Register để tạo người dùng mới
+    // 1. Lấy danh sách (GET /api/users)
+    const fetchUsers = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/users`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setUsers(data);
+            } else if (response.status === 401) {
+                navigate('/');
+            }
+        } catch (err) {
+            console.error("Lỗi kết nối:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 2. Tạo tài khoản (POST /api/users)
     const handleCreateUser = async (e) => {
         e.preventDefault();
         setMessage('');
         setIsError(false);
 
-        if (!newUser.username || !newUser.password || !newUser.full_name) {
-            setMessage('Vui lòng nhập đầy đủ Tên đăng nhập, Mật khẩu và Tên đầy đủ.');
-            setIsError(true);
-            return;
-        }
-        
         try {
-            // Sử dụng API /api/auth/register đã có
-            const response = await fetch(`${API_BASE_URL}/auth/register`, {
+            const response = await fetch(`${API_BASE_URL}/users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // API Register không cần token, nhưng chúng ta chỉ gọi nó từ giao diện Manager
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(newUser),
             });
@@ -61,12 +68,12 @@ const UserManagement = () => {
             const data = await response.json();
 
             if (response.ok) {
-                setMessage(`Tạo tài khoản '${data.user.username}' thành công! (Role: ${data.user.role})`);
-                setIsError(false);
-                setNewUser({ username: '', password: '', full_name: '', role: 'staff' }); // Reset form
-                // Nếu có API GET /users, ta sẽ gọi fetchUsers() ở đây
+                // Khớp với app.py trả về { "user": {...} }
+                setMessage(`Thành công: Đã tạo tài khoản ${data.user.username}`);
+                setNewUser({ username: '', password: '', full_name: '', role: 'staff' });
+                fetchUsers();
             } else {
-                setMessage(`Lỗi: ${data.message || 'Lỗi server khi tạo người dùng.'}`);
+                setMessage(`Lỗi: ${data.message || 'Không thể tạo tài khoản'}`);
                 setIsError(true);
             }
         } catch (err) {
@@ -75,80 +82,164 @@ const UserManagement = () => {
         }
     };
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setNewUser(prev => ({ ...prev, [name]: value }));
+    // 3. Xóa tài khoản (DELETE /api/users/<id>)
+    const handleDelete = async (id, name, username) => {
+        // Không cho phép tự xóa chính mình hoặc xóa admin gốc
+        if (username === 'admin_cafe') {
+            alert("Không thể xóa tài khoản hệ thống!");
+            return;
+        }
+
+        if (!window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${name}"?`)) return;
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/users/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                setMessage("Đã xóa nhân viên thành công.");
+                setIsError(false);
+                fetchUsers();
+            } else {
+                const data = await res.json();
+                alert(data.message || "Lỗi khi xóa");
+            }
+        } catch (err) { 
+            alert("Lỗi kết nối server"); 
+        }
     };
 
-    if (loading) return <div className="container">Đang tải trang Quản lý Người dùng...</div>;
-    if (userRole !== 'manager') return <div className="container" style={{ color: 'red' }}>Truy cập bị từ chối.</div>;
+    if (loading) return <div className="menu-container"><div className="empty-state">Đang tải dữ liệu nhân sự...</div></div>;
 
     return (
-        <div className="container menu-page">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
-                <h1>👥 Quản Lý Tài Khoản Người Dùng</h1>
-                <button onClick={() => navigate('/menu')}>← Quay lại Menu</button>
-            </div>
-            
-            <p style={{ marginTop: '15px' }}>Sử dụng trang này để tạo tài khoản mới cho Staff hoặc Manager.</p>
+        <div className="menu-container">
+            <header className="menu-header">
+                <div className="header-title">
+                    <h1>👥 Quản Lý Nhân Sự</h1>
+                    <p className="welcome-text">Cấp quyền và quản lý tài khoản nhân viên.</p>
+                </div>
+                <button className="btn btn-menu" onClick={() => navigate('/menu')}>← Quay lại Menu</button>
+            </header>
 
-            <div style={{ margin: '20px 0', padding: '20px', border: '1px solid #007bff', borderRadius: '8px' }}>
-                <h2>+ Tạo Tài Khoản Mới</h2>
+            <div className="user-mgmt-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '30px' }}>
                 
-                {message && (
-                    <p style={{ color: isError ? 'red' : 'green', fontWeight: 'bold', border: `1px solid ${isError ? 'red' : 'green'}`, padding: '10px', borderRadius: '5px' }}>
-                        {message}
-                    </p>
-                )}
-
-                <form onSubmit={handleCreateUser} style={{ display: 'grid', gap: '10px' }}>
-                    <input 
-                        type="text" 
-                        name="username"
-                        value={newUser.username} 
-                        onChange={handleInputChange}
-                        placeholder="Tên đăng nhập (Username)"
-                        required
-                        style={{ padding: '10px' }}
-                    />
-                    <input 
-                        type="password" 
-                        name="password"
-                        value={newUser.password} 
-                        onChange={handleInputChange}
-                        placeholder="Mật khẩu"
-                        required
-                        style={{ padding: '10px' }}
-                    />
-                    <input 
-                        type="text" 
-                        name="full_name"
-                        value={newUser.full_name} 
-                        onChange={handleInputChange}
-                        placeholder="Tên đầy đủ"
-                        required
-                        style={{ padding: '10px' }}
-                    />
-                    <select 
-                        name="role"
-                        value={newUser.role}
-                        onChange={handleInputChange}
-                        required
-                        style={{ padding: '10px' }}
-                    >
-                        <option value="staff">Staff (Nhân viên)</option>
-                        <option value="manager">Manager (Quản lý)</option>
-                    </select>
+                {/* CỘT TRÁI: FORM TẠO MỚI */}
+                <div className="category-section">
+                    <h3 className="category-title">Tạo Tài Khoản Mới</h3>
                     
-                    <button type="submit" style={{ backgroundColor: '#007bff', padding: '10px', marginTop: '10px' }}>Tạo Tài Khoản</button>
-                </form>
+                    {message && (
+                        <div style={{ 
+                            padding: '12px', 
+                            marginBottom: '15px', 
+                            borderRadius: '6px',
+                            backgroundColor: isError ? '#fff5f5' : '#f0fff4',
+                            color: isError ? '#c53030' : '#2f855a',
+                            border: `1px solid ${isError ? '#feb2b2' : '#9ae6b4'}`,
+                            fontSize: '0.9rem'
+                        }}>
+                            {message}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Tên đăng nhập</label>
+                            <input 
+                                className="search-input" 
+                                placeholder="Ví dụ: hoa_nguyen" 
+                                value={newUser.username} 
+                                onChange={e => setNewUser({...newUser, username: e.target.value})} 
+                                required 
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Mật khẩu</label>
+                            <input 
+                                className="search-input" 
+                                type="password" 
+                                placeholder="Tối thiểu 6 ký tự" 
+                                value={newUser.password} 
+                                onChange={e => setNewUser({...newUser, password: e.target.value})} 
+                                required 
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Họ và tên</label>
+                            <input 
+                                className="search-input" 
+                                placeholder="Nhập tên đầy đủ" 
+                                value={newUser.full_name} 
+                                onChange={e => setNewUser({...newUser, full_name: e.target.value})} 
+                                required 
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Chức vụ</label>
+                            <select 
+                                className="search-input" 
+                                value={newUser.role} 
+                                onChange={e => setNewUser({...newUser, role: e.target.value})}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="staff">Nhân viên (Staff)</option>
+                                <option value="manager">Quản lý (Manager)</option>
+                            </select>
+                        </div>
+                        <button type="submit" className="btn btn-create-order" style={{ width: '100%', marginTop: '10px' }}>
+                            ➕ TẠO TÀI KHOẢN
+                        </button>
+                    </form>
+                </div>
+
+                {/* CỘT PHẢI: DANH SÁCH NHÂN VIÊN */}
+                <div className="category-section">
+                    <h3 className="category-title">Danh Sách Nhân Viên ({users.length})</h3>
+                    <div className="user-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {users.map(u => (
+                            <div key={u.id} className="product-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px' }}>
+                                <div className="product-info">
+                                    <span className="product-name" style={{ fontSize: '1.1rem' }}>{u.full_name}</span>
+                                    <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                                        <span style={{ 
+                                            padding: '2px 8px', 
+                                            borderRadius: '10px', 
+                                            backgroundColor: u.role === 'manager' ? '#ebf8ff' : '#f7fafc',
+                                            color: u.role === 'manager' ? '#2b6cb0' : '#4a5568',
+                                            marginRight: '8px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {u.role.toUpperCase()}
+                                        </span>
+                                        @{u.username}
+                                    </div>
+                                </div>
+                                <div className="actions">
+                                    {u.username !== 'admin_cafe' ? (
+                                        <button 
+                                            onClick={() => handleDelete(u.id, u.full_name, u.username)} 
+                                            style={{ 
+                                                color: '#e53e3e', 
+                                                border: '1px solid #fed7d7', 
+                                                backgroundColor: '#fff5f5', 
+                                                padding: '5px 12px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.85rem'
+                                            }}
+                                        >
+                                            Xóa
+                                        </button>
+                                    ) : (
+                                        <span style={{ color: '#a0aec0', fontSize: '0.8rem', fontStyle: 'italic' }}>Tài khoản gốc</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
-            
-            {/* Nếu có API GET /api/users, bạn sẽ hiển thị danh sách ở đây */}
-            {/* <div>
-                <h2>Danh sách Người dùng</h2>
-                ... (Hiển thị users.map) ...
-            </div> */}
         </div>
     );
 };

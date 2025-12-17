@@ -1,6 +1,6 @@
-// src/components/OrderList.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './Menu.css'; // Đảm bảo bạn đã có file CSS này để giao diện đẹp mắt
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 const VALID_STATUSES = ['pending', 'completed', 'cancelled'];
@@ -10,19 +10,14 @@ const OrderList = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    
     const token = localStorage.getItem('access_token');
     const userRole = localStorage.getItem('user_role');
 
-    // Hàm chung để fetch và cập nhật trạng thái
+    // Hàm lấy danh sách đơn hàng
     const fetchOrders = async () => {
-        if (!token) {
+        if (!token || userRole !== 'manager') {
             navigate('/');
-            return;
-        }
-
-        if (userRole !== 'manager') {
-            setError('Bạn không có quyền Quản lý để xem danh sách đơn hàng.');
-            setLoading(false);
             return;
         }
 
@@ -32,18 +27,15 @@ const OrderList = () => {
             });
 
             if (response.status === 403) {
-                setError('Lỗi 403: Chỉ Quản lý mới có quyền xem đơn hàng.');
+                setError('Chỉ Quản lý mới có quyền xem danh sách này.');
                 return;
             }
-            if (!response.ok) {
-                throw new Error('Lỗi tải danh sách đơn hàng.');
-            }
+            if (!response.ok) throw new Error('Lỗi tải danh sách đơn hàng.');
 
             const data = await response.json();
             setOrders(data);
         } catch (err) {
-            setError(`Lỗi: ${err.message}`);
-            console.error('Lỗi tải đơn hàng:', err);
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -52,9 +44,9 @@ const OrderList = () => {
     useEffect(() => {
         fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, navigate, userRole]);
+    }, []);
 
-    // Hàm cập nhật trạng thái (PUT API)
+    // Hàm cập nhật trạng thái đơn hàng (Khớp với Route PUT trong app.py)
     const handleUpdateStatus = async (orderId, newStatus) => {
         try {
             const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
@@ -66,87 +58,96 @@ const OrderList = () => {
                 body: JSON.stringify({ order_status: newStatus })
             });
 
-            if (!response.ok) {
+            if (response.ok) {
+                // Tải lại danh sách để cập nhật giao diện ngay lập tức
+                fetchOrders(); 
+            } else {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Lỗi khi cập nhật trạng thái.');
+                alert(`Lỗi: ${errorData.message}`);
             }
-
-            // Cập nhật lại danh sách sau khi PUT thành công
-            fetchOrders(); 
-
         } catch (err) {
-            alert(`Cập nhật thất bại: ${err.message}`);
-        }
-    };
-    
-    // Hàm hiển thị màu sắc cho trạng thái
-    const getStatusStyle = (status) => {
-        switch (status) {
-            case 'completed': return { backgroundColor: '#d4edda', color: '#155724', padding: '5px', borderRadius: '5px' };
-            case 'cancelled': return { backgroundColor: '#f8d7da', color: '#721c24', padding: '5px', borderRadius: '5px' };
-            case 'pending':
-            default: return { backgroundColor: '#fff3cd', color: '#856404', padding: '5px', borderRadius: '5px' };
+            alert('Không thể kết nối đến máy chủ.');
         }
     };
 
-    if (loading) return <div className="container">Đang tải danh sách đơn hàng...</div>;
-    if (error) return <div className="container" style={{ color: 'red' }}>{error}</div>;
+    // Hàm chuyển đổi nhãn trạng thái sang tiếng Việt và Icon
+    const getStatusInfo = (status) => {
+        switch (status) {
+            case 'completed': return { label: '✅ HOÀN THÀNH', color: '#28a745' };
+            case 'cancelled': return { label: '❌ ĐÃ HỦY', color: '#dc3545' };
+            default: return { label: '⏳ ĐANG CHỜ', color: '#ffc107' };
+        }
+    };
+
+    if (loading) return <div className="menu-container"><div className="empty-state">Đang tải đơn hàng...</div></div>;
+    if (error) return <div className="menu-container" style={{ color: 'red', textAlign: 'center' }}>{error}</div>;
 
     return (
-        <div className="container menu-page">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
-                <h1>📄 Quản Lý Đơn Hàng ({orders.length} đơn)</h1>
-                <button onClick={() => navigate('/menu')}>← Quay lại Menu</button>
-            </div>
-            
-            <p style={{ marginTop: '15px' }}>Chỉ Quản lý (Manager) mới có thể truy cập trang này.</p>
+        <div className="menu-container">
+            <header className="menu-header">
+                <div className="header-title">
+                    <h1>📄 Quản Lý Đơn Hàng</h1>
+                    <p className="welcome-text">Tổng cộng <strong>{orders.length}</strong> đơn hàng đã được ghi nhận.</p>
+                </div>
+                <button className="btn btn-menu" onClick={() => navigate('/menu')}>← Quay lại Menu</button>
+            </header>
 
             {orders.length === 0 ? (
-                <p style={{ marginTop: '20px' }}>Chưa có đơn hàng nào được tạo.</p>
+                <div className="empty-state">Hệ thống chưa ghi nhận đơn hàng nào.</div>
             ) : (
-                <div style={{ display: 'grid', gap: '20px', marginTop: '20px' }}>
-                    {orders.sort((a, b) => b.id - a.id).map(order => (
-                        <div key={order.id} style={{ border: '1px solid #007bff', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                <h3>Đơn hàng #{order.id}</h3>
-                                <span style={getStatusStyle(order.order_status)}>{order.order_status.toUpperCase()}</span>
-                            </div>
-                            
-                            <p><strong>Tổng tiền:</strong> {order.total_amount.toLocaleString('vi-VN')} VND</p>
-                            <p><strong>Người tạo:</strong> {order.created_by} ({order.user_id})</p>
-                            <p><strong>Thanh toán:</strong> {order.payment_method}</p>
-                            <p><strong>Thời gian:</strong> {new Date(order.created_at).toLocaleString('vi-VN')}</p>
+                <div className="product-grid" style={{ gridTemplateColumns: '1fr' }}>
+                    {orders.map(order => {
+                        const statusInfo = getStatusInfo(order.order_status);
+                        return (
+                            <div key={order.id} className="category-section" style={{ borderLeft: `8px solid ${statusInfo.color}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3 style={{ margin: 0 }}>Đơn hàng #{order.id}</h3>
+                                        <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#666' }}>
+                                            Ngày: {new Date(order.created_at).toLocaleString('vi-VN')}
+                                        </p>
+                                        <p style={{ margin: '5px 0' }}>Bán bởi: <strong>{order.created_by}</strong></p>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div className="product-price" style={{ fontSize: '1.4rem', marginBottom: '5px' }}>
+                                            {order.total_amount.toLocaleString('vi-VN')} đ
+                                        </div>
+                                        <span style={{ fontWeight: 'bold', color: statusInfo.color }}>{statusInfo.label}</span>
+                                    </div>
+                                </div>
 
-                            <h4 style={{ marginTop: '10px', borderBottom: '1px dotted #ccc', paddingBottom: '5px' }}>Chi tiết ({order.items.length} món)</h4>
-                            <ul style={{ listStyleType: 'none', paddingLeft: '10px' }}>
-                                {order.items.map((item, index) => (
-                                    <li key={index} style={{ marginBottom: '5px' }}>
-                                        {item.quantity} x {item.product_name} 
-                                        ({item.unit_price.toLocaleString('vi-VN')} VND)
-                                        {item.notes && <span style={{ fontStyle: 'italic', color: '#6c757d' }}> - {item.notes}</span>}
-                                    </li>
-                                ))}
-                            </ul>
+                                <div style={{ margin: '15px 0', padding: '10px', background: '#f8f9fa', borderRadius: '8px' }}>
+                                    <h4 style={{ marginTop: 0, fontSize: '1rem', borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Chi tiết món:</h4>
+                                    {order.items.map((item, idx) => (
+                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                                            <span>{item.quantity} x <strong>{item.product_name}</strong></span>
+                                            <span>{(item.quantity * item.unit_price).toLocaleString('vi-VN')} đ</span>
+                                        </div>
+                                    ))}
+                                </div>
 
-                            <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                                <label style={{ marginRight: '10px' }}>Cập nhật trạng thái:</label>
-                                {VALID_STATUSES.map(status => (
-                                    <button
-                                        key={status}
-                                        onClick={() => handleUpdateStatus(order.id, status)}
-                                        disabled={order.order_status === status}
-                                        style={{ 
-                                            marginRight: '5px', 
-                                            backgroundColor: order.order_status === status ? '#ccc' : (status === 'completed' ? '#28a745' : (status === 'cancelled' ? '#dc3545' : '#ffc107')),
-                                            padding: '5px 10px'
-                                        }}
-                                    >
-                                        {status.toUpperCase()}
-                                    </button>
-                                ))}
+                                <div className="button-group" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    <label style={{ fontSize: '0.9rem', alignSelf: 'center' }}>Cập nhật trạng thái:</label>
+                                    {VALID_STATUSES.map(status => (
+                                        <button 
+                                            key={status}
+                                            className="btn"
+                                            style={{ 
+                                                fontSize: '0.75rem', 
+                                                padding: '5px 10px',
+                                                backgroundColor: order.order_status === status ? '#adb5bd' : 
+                                                               (status === 'completed' ? '#28a745' : status === 'cancelled' ? '#dc3545' : '#ffc107')
+                                            }}
+                                            onClick={() => handleUpdateStatus(order.id, status)}
+                                            disabled={order.order_status === status}
+                                        >
+                                            {status === 'pending' ? 'CHỜ' : status === 'completed' ? 'HOÀN THÀNH' : 'HỦY'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

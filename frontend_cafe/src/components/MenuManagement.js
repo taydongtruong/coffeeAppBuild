@@ -1,33 +1,36 @@
-// src/components/MenuManagement.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
-// Hàm hiển thị thông báo lỗi/thành công
 const StatusMessage = ({ message, isError }) => (
-    message ? <p style={{ color: isError ? 'red' : 'green', fontWeight: 'bold' }}>{message}</p> : null
+    message ? (
+        <div style={{ 
+            padding: '10px', 
+            marginBottom: '15px', 
+            borderRadius: '5px', 
+            backgroundColor: isError ? '#f8d7da' : '#d4edda',
+            color: isError ? '#721c24' : '#155724',
+            border: `1px solid ${isError ? '#f5c6cb' : '#c3e6cb'}`
+        }}>
+            {message}
+        </div>
+    ) : null
 );
 
 const MenuManagement = () => {
-    const [menuData, setMenuData] = useState([]); // Chứa Categories và Products
-    const [categories, setCategories] = useState([]); // Chỉ chứa danh sách Categories
+    const [menuData, setMenuData] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
     const [isError, setIsError] = useState(false);
+    
     const navigate = useNavigate();
     const token = localStorage.getItem('access_token');
     const userRole = localStorage.getItem('user_role');
 
-    // State cho Form thêm Category
     const [newCategoryName, setNewCategoryName] = useState('');
-    
-    // State cho Form thêm Product
-    const [newProduct, setNewProduct] = useState({
-        name: '',
-        price: '',
-        category_id: ''
-    });
+    const [newProduct, setNewProduct] = useState({ name: '', price: '', category_id: '' });
 
     useEffect(() => {
         if (!token || userRole !== 'manager') {
@@ -35,64 +38,44 @@ const MenuManagement = () => {
             return;
         }
         fetchMenuData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, navigate, userRole]);
-    
-    // --- 1. Fetch Dữ liệu (GET) ---
 
+    // --- 1. Lấy dữ liệu ---
     const fetchMenuData = async () => {
         setLoading(true);
         try {
             const headers = { 'Authorization': `Bearer ${token}` };
-
-            const [categoriesResponse, productsResponse] = await Promise.all([
+            const [catRes, prodRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/categories`, { headers }),
                 fetch(`${API_BASE_URL}/products`, { headers })
             ]);
 
-            if (!categoriesResponse.ok || !productsResponse.ok) {
-                if (categoriesResponse.status === 403 || productsResponse.status === 403) {
-                    throw new Error("403: Bạn không có quyền Quản lý.");
-                }
-                throw new Error('Lỗi tải dữ liệu Menu.');
+            if (catRes.status === 401 || prodRes.status === 401) {
+                navigate('/'); return;
             }
 
-            const categoriesData = await categoriesResponse.json();
-            const productsData = await productsResponse.json();
-            
-            setCategories(categoriesData); // Lưu danh sách Category riêng
-            
-            const categorizedMenu = categoriesData.map(cat => ({
+            const categoriesData = await catRes.json();
+            const productsData = await prodRes.json();
+
+            setCategories(categoriesData);
+            const combined = categoriesData.map(cat => ({
                 ...cat,
                 products: productsData.filter(p => p.category_id === cat.id)
             }));
-
-            setMenuData(categorizedMenu);
-
+            setMenuData(combined);
         } catch (err) {
-            setMessage(`Lỗi: ${err.message}`);
+            setMessage("Không thể kết nối đến máy chủ.");
             setIsError(true);
-            console.error('Lỗi tải menu:', err);
         } finally {
             setLoading(false);
         }
     };
-    
-    // --- 2. Xử lý Category (POST, DELETE) ---
 
+    // --- 2. Quản lý Danh mục (Category) ---
     const handleCreateCategory = async (e) => {
         e.preventDefault();
-        setMessage('');
-        setIsError(false);
-
-        if (!newCategoryName) {
-            setMessage('Tên danh mục không được trống.');
-            setIsError(true);
-            return;
-        }
-
         try {
-            const response = await fetch(`${API_BASE_URL}/categories`, {
+            const res = await fetch(`${API_BASE_URL}/categories`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -100,140 +83,83 @@ const MenuManagement = () => {
                 },
                 body: JSON.stringify({ name: newCategoryName }),
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setMessage(`Tạo danh mục '${data.category.name}' thành công.`);
+            const data = await res.json();
+            if (res.ok) {
+                setMessage(`Đã thêm danh mục: ${data.category.name}`);
+                setIsError(false);
                 setNewCategoryName('');
-                fetchMenuData(); // Tải lại dữ liệu
+                fetchMenuData();
             } else {
-                setMessage(`Lỗi: ${data.message || 'Lỗi server.'}`);
-                setIsError(true);
+                throw new Error(data.message);
             }
-        } catch (error) {
-            setMessage('Lỗi kết nối Server Flask.');
+        } catch (err) {
+            setMessage(err.message);
             setIsError(true);
         }
     };
 
-    const handleDeleteCategory = async (categoryId) => {
-        if (!window.confirm("Bạn có chắc chắn muốn xóa danh mục này? Tất cả sản phẩm thuộc danh mục này phải được xóa trước.")) return;
-        
-        setMessage('');
-        setIsError(false);
-
+    const handleDeleteCategory = async (id) => {
+        if (!window.confirm("Xóa danh mục này?")) return;
         try {
-            const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+            const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setMessage(`Xóa danh mục thành công.`);
+            if (res.ok) {
+                setMessage("Đã xóa danh mục.");
+                setIsError(false);
                 fetchMenuData();
             } else {
-                setMessage(`Lỗi: ${data.message || 'Lỗi server.'}`);
+                const data = await res.json();
+                setMessage(data.message);
                 setIsError(true);
             }
-        } catch (error) {
-            setMessage('Lỗi kết nối Server Flask.');
+        } catch (err) {
+            setMessage("Lỗi khi xóa.");
             setIsError(true);
         }
     };
 
-    // --- 3. Xử lý Product (POST, PUT, DELETE) ---
-    
-    const handleNewProductChange = (e) => {
-        const { name, value } = e.target;
-        setNewProduct(prev => ({ ...prev, [name]: value }));
-    };
-
+    // --- 3. Quản lý Sản phẩm (Product) ---
     const handleCreateProduct = async (e) => {
         e.preventDefault();
-        setMessage('');
-        setIsError(false);
-
-        const payload = {
-            ...newProduct,
-            price: parseFloat(newProduct.price),
-            category_id: parseInt(newProduct.category_id)
-        };
-
-        if (!payload.name || isNaN(payload.price) || payload.price <= 0 || !payload.category_id) {
-            setMessage('Vui lòng nhập đầy đủ Tên, Giá hợp lệ và chọn Danh mục.');
-            setIsError(true);
-            return;
-        }
-        
         try {
-            const response = await fetch(`${API_BASE_URL}/products`, {
+            const res = await fetch(`${API_BASE_URL}/products`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    name: newProduct.name,
+                    price: parseFloat(newProduct.price),
+                    category_id: parseInt(newProduct.category_id)
+                }),
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setMessage(`Tạo sản phẩm '${data.product.name}' thành công.`);
+            const data = await res.json();
+            if (res.ok) {
+                setMessage(`Đã thêm: ${data.product.name}`);
+                setIsError(false);
                 setNewProduct({ name: '', price: '', category_id: '' });
-                fetchMenuData(); 
-            } else {
-                setMessage(`Lỗi: ${data.message || 'Lỗi server.'}`);
-                setIsError(true);
-            }
-        } catch (error) {
-            setMessage('Lỗi kết nối Server Flask.');
-            setIsError(true);
-        }
-    };
-
-    const handleDeleteProduct = async (productId) => {
-        if (!window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này không?")) return;
-
-        setMessage('');
-        setIsError(false);
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setMessage(`Xóa sản phẩm thành công.`);
                 fetchMenuData();
             } else {
-                setMessage(`Lỗi: ${data.message || 'Lỗi server.'}`);
+                setMessage(data.message);
                 setIsError(true);
             }
-        } catch (error) {
-            setMessage('Lỗi kết nối Server Flask.');
+        } catch (err) {
+            setMessage("Lỗi kết nối.");
             setIsError(true);
         }
     };
 
-    // Hàm cho phép sửa tên/giá/tình trạng (Tạm thời dùng Prompt)
     const handleEditProduct = async (product) => {
-        const newName = prompt(`Nhập tên mới cho '${product.name}':`, product.name);
-        if (newName === null) return;
-        
-        const newPrice = prompt(`Nhập giá mới cho '${newName}':`, product.price);
-        if (newPrice === null || isNaN(parseFloat(newPrice)) || parseFloat(newPrice) <= 0) {
-            alert("Giá không hợp lệ.");
-            return;
-        }
+        const newName = prompt("Tên sản phẩm mới:", product.name);
+        if (!newName) return;
+        const newPrice = prompt("Giá mới:", product.price);
+        if (!newPrice) return;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/products/${product.id}`, {
+            const res = await fetch(`${API_BASE_URL}/products/${product.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -241,148 +167,119 @@ const MenuManagement = () => {
                 },
                 body: JSON.stringify({ name: newName, price: parseFloat(newPrice) }),
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setMessage(`Cập nhật sản phẩm '${data.product.name}' thành công.`);
-                fetchMenuData(); 
-            } else {
-                setMessage(`Lỗi cập nhật: ${data.message || 'Lỗi server.'}`);
-                setIsError(true);
+            if (res.ok) {
+                setMessage("Cập nhật thành công!");
+                setIsError(false);
+                fetchMenuData();
             }
-        } catch (error) {
-            setMessage('Lỗi kết nối Server Flask.');
+        } catch (err) {
+            alert("Lỗi cập nhật.");
+        }
+    };
+
+    const handleDeleteProduct = async (id) => {
+        if (!window.confirm("Xóa sản phẩm này?")) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setMessage("Đã xóa sản phẩm.");
+                setIsError(false);
+                fetchMenuData();
+            }
+        } catch (err) {
+            setMessage("Lỗi khi xóa.");
             setIsError(true);
         }
     };
 
-
-    if (loading) return <div className="container">Đang tải Menu Quản lý...</div>;
-    if (userRole !== 'manager') return <div className="container" style={{ color: 'red' }}>Truy cập bị từ chối.</div>;
+    if (loading) return <div className="container">Đang tải dữ liệu...</div>;
 
     return (
-        <div className="container menu-page">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
-                <h1>⚙️ Bảng Điều Khiển Quản Lý Menu</h1>
-                <button onClick={() => navigate('/menu')}>← Quay lại Menu</button>
+        <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <h2>⚙️ Quản Lý Menu (Admin)</h2>
+                <button onClick={() => navigate('/menu')} style={{ backgroundColor: '#6c757d' }}>Trở về Menu</button>
             </div>
-            
+
             <StatusMessage message={message} isError={isError} />
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px', marginTop: '20px' }}>
-                
-                {/* Cột 1: Quản lý Category và Thêm Product */}
-                <div>
-                    {/* Thêm Category */}
-                    <div style={{ border: '1px solid #007bff', padding: '15px', borderRadius: '5px', marginBottom: '20px' }}>
-                        <h3>+ Thêm Danh Mục Mới</h3>
-                        <form onSubmit={handleCreateCategory}>
-                            <input 
-                                type="text" 
-                                value={newCategoryName} 
-                                onChange={(e) => setNewCategoryName(e.target.value)}
-                                placeholder="Tên danh mục (vd: Cafe Đá, Trà Trái Cây)"
-                                required
-                                style={{ width: '100%', marginBottom: '10px' }}
-                            />
-                            <button type="submit" style={{ width: '100%', backgroundColor: '#007bff' }}>Tạo Danh Mục</button>
-                        </form>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }}>
+                {/* Form thêm mới */}
+                <aside>
+                    <div style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '20px' }}>
+                        <h4 style={{ marginTop: 0 }}>+ Danh mục mới</h4>
+                        <input 
+                            type="text" 
+                            placeholder="Tên danh mục..." 
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+                        />
+                        <button onClick={handleCreateCategory} style={{ width: '100%' }}>Thêm danh mục</button>
                     </div>
 
-                    {/* Thêm Product */}
-                    <div style={{ border: '1px solid #28a745', padding: '15px', borderRadius: '5px', marginBottom: '20px' }}>
-                        <h3>+ Thêm Sản Phẩm Mới</h3>
-                        <form onSubmit={handleCreateProduct}>
-                            <input 
-                                type="text" 
-                                name="name"
-                                value={newProduct.name} 
-                                onChange={handleNewProductChange}
-                                placeholder="Tên sản phẩm (vd: Latte, Trà Đào)"
-                                required
-                                style={{ width: '100%', marginBottom: '10px' }}
-                            />
-                            <input 
-                                type="number" 
-                                name="price"
-                                value={newProduct.price} 
-                                onChange={handleNewProductChange}
-                                placeholder="Giá (VND)"
-                                required
-                                min="1000"
-                                style={{ width: '100%', marginBottom: '10px' }}
-                            />
-                            <select 
-                                name="category_id"
-                                value={newProduct.category_id}
-                                onChange={handleNewProductChange}
-                                required
-                                style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
-                            >
-                                <option value="">-- Chọn Danh mục --</option>
-                                {categories.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </select>
-                            <button type="submit" style={{ width: '100%', backgroundColor: '#28a745' }}>Tạo Sản Phẩm</button>
-                        </form>
+                    <div style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '8px' }}>
+                        <h4 style={{ marginTop: 0 }}>+ Sản phẩm mới</h4>
+                        <input 
+                            type="text" 
+                            placeholder="Tên món..." 
+                            value={newProduct.name}
+                            onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                            style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+                        />
+                        <input 
+                            type="number" 
+                            placeholder="Giá VND..." 
+                            value={newProduct.price}
+                            onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                            style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+                        />
+                        <select 
+                            value={newProduct.category_id}
+                            onChange={(e) => setNewProduct({...newProduct, category_id: e.target.value})}
+                            style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
+                        >
+                            <option value="">Chọn danh mục</option>
+                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        <button onClick={handleCreateProduct} style={{ width: '100%', backgroundColor: '#28a745' }}>Thêm sản phẩm</button>
                     </div>
-                </div>
+                </aside>
 
-                {/* Cột 2: Danh sách và CRUD Product */}
-                <div>
-                    <h2>Danh Sách & Quản lý Sản Phẩm</h2>
-                    {menuData.length === 0 ? (
-                        <p style={{ fontStyle: 'italic', color: '#888' }}>Chưa có danh mục nào.</p>
-                    ) : (
-                        menuData.map(category => (
-                            <div key={category.id} style={{ marginBottom: '20px', border: '1px solid #ddd', padding: '15px', borderRadius: '5px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>
-                                    <h3 style={{ color: '#007bff' }}>{category.name}</h3>
-                                    <button 
-                                        onClick={() => handleDeleteCategory(category.id)} 
-                                        style={{ backgroundColor: '#dc3545', padding: '5px 10px' }}
-                                        disabled={category.products.length > 0}
-                                        title={category.products.length > 0 ? "Phải xóa hết sản phẩm trước khi xóa danh mục" : "Xóa Danh mục"}
-                                    >
-                                        Xóa
-                                    </button>
-                                </div>
-                                
-                                {category.products.length > 0 ? (
-                                    <ul style={{ listStyleType: 'none', padding: 0 }}>
-                                        {category.products.map(product => (
-                                            <li key={product.id} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dotted #ccc', padding: '10px 0', alignItems: 'center' }}>
-                                                <span>
-                                                    <strong>{product.name}</strong> - 
-                                                    {product.price.toLocaleString('vi-VN')} VND (ID: {product.id})
-                                                </span>
-                                                <div>
-                                                    <button 
-                                                        onClick={() => handleEditProduct(product)} 
-                                                        style={{ backgroundColor: '#ffc107', marginRight: '5px', padding: '5px 10px' }}
-                                                    >
-                                                        Sửa
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteProduct(product.id)} 
-                                                        style={{ backgroundColor: '#dc3545', padding: '5px 10px' }}
-                                                    >
-                                                        Xóa
-                                                    </button>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p style={{ fontStyle: 'italic', color: '#888' }}>Chưa có sản phẩm nào trong danh mục này.</p>
-                                )}
+                {/* Danh sách hiển thị */}
+                <main>
+                    {menuData.map(cat => (
+                        <div key={cat.id} style={{ marginBottom: '25px', padding: '15px', border: '1px solid #eee', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #007bff', paddingBottom: '5px' }}>
+                                <h3 style={{ margin: 0 }}>{cat.name}</h3>
+                                <button 
+                                    onClick={() => handleDeleteCategory(cat.id)}
+                                    disabled={cat.products.length > 0}
+                                    style={{ padding: '2px 8px', backgroundColor: cat.products.length > 0 ? '#ccc' : '#dc3545', fontSize: '12px' }}
+                                >
+                                    Xóa DM
+                                </button>
                             </div>
-                        ))
-                    )}
-                </div>
-
+                            <table style={{ width: '100%', marginTop: '10px', borderCollapse: 'collapse' }}>
+                                <tbody>
+                                    {cat.products.map(p => (
+                                        <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+                                            <td style={{ padding: '10px 0' }}><strong>{p.name}</strong></td>
+                                            <td>{p.price.toLocaleString()}đ</td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                <button onClick={() => handleEditProduct(p)} style={{ backgroundColor: '#ffc107', color: '#000', marginRight: '5px', padding: '3px 10px' }}>Sửa</button>
+                                                <button onClick={() => handleDeleteProduct(p.id)} style={{ backgroundColor: '#dc3545', padding: '3px 10px' }}>Xóa</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ))}
+                </main>
             </div>
         </div>
     );

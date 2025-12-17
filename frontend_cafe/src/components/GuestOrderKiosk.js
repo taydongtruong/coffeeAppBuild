@@ -1,4 +1,3 @@
-// src/components/GuestOrderKiosk.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,7 +20,6 @@ const GuestOrderKiosk = () => {
         setLoading(true);
         setError('');
         try {
-            // Lấy Menu không cần token
             const [categoriesResponse, productsResponse] = await Promise.all([
                 fetch(`${API_BASE_URL}/categories`),
                 fetch(`${API_BASE_URL}/products`)
@@ -36,33 +34,22 @@ const GuestOrderKiosk = () => {
             }));
 
             setMenuData(categorizedMenu);
-
         } catch (err) {
-            setError('Lỗi kết nối Server hoặc dữ liệu Menu không hợp lệ.');
-            console.error('Lỗi tải menu:', err);
+            setError('Không thể kết nối với máy chủ. Vui lòng kiểm tra Backend Flask.');
         } finally {
             setLoading(false);
         }
     };
-    
-    // --- Xử lý Giỏ hàng ---
 
     const handleAddToCart = (product) => {
         setMessage('');
-        setIsError(false);
-        
         const existingItemIndex = cart.findIndex(item => item.product_id === product.id);
 
         if (existingItemIndex > -1) {
-            // Tăng số lượng nếu sản phẩm đã có
-            const updatedCart = cart.map((item, index) => 
-                index === existingItemIndex 
-                ? { ...item, quantity: item.quantity + 1 } 
-                : item
-            );
+            const updatedCart = [...cart];
+            updatedCart[existingItemIndex].quantity += 1;
             setCart(updatedCart);
         } else {
-            // Thêm mới
             setCart([...cart, { 
                 product_id: product.id, 
                 product_name: product.name,
@@ -76,170 +63,143 @@ const GuestOrderKiosk = () => {
     const updateQuantity = (product_id, delta) => {
         const updatedCart = cart.map(item => 
             item.product_id === product_id 
-            ? { ...item, quantity: Math.max(1, item.quantity + delta) } // Đảm bảo số lượng >= 1
-            : item
-        ).filter(item => item.quantity > 0); // Loại bỏ nếu số lượng về 0 (để xóa)
-        
-        setCart(updatedCart);
-    };
-
-    const updateNotes = (product_id, notes) => {
-        const updatedCart = cart.map(item => 
-            item.product_id === product_id 
-            ? { ...item, notes: notes }
+            ? { ...item, quantity: Math.max(1, item.quantity + delta) }
             : item
         );
         setCart(updatedCart);
     };
 
-    const removeFromCart = (product_id) => {
-        setCart(cart.filter(item => item.product_id !== product_id));
-    };
-
-    const calculateTotal = () => {
-        return cart.reduce((total, item) => total + (item.unit_price * item.quantity), 0);
-    };
-
-    // --- Xử lý Đặt hàng ---
-
     const handlePlaceOrder = async () => {
-        if (cart.length === 0) {
-            setMessage('Giỏ hàng trống! Vui lòng chọn món.');
-            setIsError(true);
-            return;
-        }
+        if (cart.length === 0) return;
 
-        setMessage('');
-        setIsError(false);
-
-        // Chuẩn bị payload cho API POST /api/orders
+        // Chuẩn bị payload khớp với app.py mới
         const itemsPayload = cart.map(item => ({
             product_id: item.product_id,
             quantity: item.quantity,
+            unit_price: item.unit_price,
             notes: item.notes
         }));
         
         try {
             const response = await fetch(`${API_BASE_URL}/orders`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // KHÔNG gửi token
-                },
-                body: JSON.stringify({ items: itemsPayload, payment_method: 'kiosk_cash' }), // Loại thanh toán có thể tùy chỉnh
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: itemsPayload }),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                setMessage(`Đặt hàng thành công! Tổng tiền: ${calculateTotal().toLocaleString('vi-VN')} VND. Mã đơn: ${data.order.id}. Vui lòng chờ nhân viên gọi tên!`);
-                setCart([]); // Xóa giỏ hàng sau khi đặt
+                setMessage(`🎉 ĐẶT HÀNG THÀNH CÔNG! Mã đơn của bạn là #${data.order.id}. Vui lòng chuẩn bị tiền mặt và chờ gọi món.`);
+                setCart([]);
                 setIsError(false);
+                // Tự động xóa thông báo sau 10 giây để đón khách mới
+                setTimeout(() => setMessage(''), 10000);
             } else {
-                setMessage(`Lỗi đặt hàng: ${data.message || 'Lỗi server.'}`);
+                setMessage(`Lỗi: ${data.message}`);
                 setIsError(true);
             }
         } catch (err) {
-            setMessage('Lỗi kết nối Server Flask.');
+            setMessage('Lỗi kết nối Server.');
             setIsError(true);
         }
     };
 
-    if (loading) return <div className="container">Đang tải Menu Quán Cafe...</div>;
-    if (error) return <div className="container" style={{ color: 'red' }}>{error}</div>;
-
-    const totalAmount = calculateTotal();
+    if (loading) return <div style={{ textAlign: 'center', padding: '50px', fontSize: '24px' }}>☕ Đang tải menu...</div>;
 
     return (
-        <div className="container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px', padding: '20px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
             
-            {/* Cột 1: Menu và Danh sách Sản phẩm */}
-            <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
-                    <h1 style={{ color: '#8d6e63' }}>☕ Menu Đặt Món Tự Động</h1>
-                    <button onClick={() => navigate('/')} style={{ backgroundColor: '#ccc', color: '#333' }}>← Quay lại Trang Đăng nhập (Nội bộ)</button>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#4e342e', padding: '20px', borderRadius: '15px', color: 'white', marginBottom: '20px' }}>
+                <div>
+                    <h1 style={{ margin: 0 }}>REAK SMAAY COFFEE ☕</h1>
+                    <p style={{ margin: 0, opacity: 0.8 }}>Quý khách vui lòng tự chọn món và nhận số thứ tự tại quầy</p>
                 </div>
+                <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '10px 15px', borderRadius: '5px', cursor: 'pointer' }}>
+                    🔐 Nhân viên Đăng nhập
+                </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '20px' }}>
                 
-                {menuData.length === 0 ? (
-                    <p style={{ fontStyle: 'italic', color: '#888', marginTop: '20px' }}>Menu trống. Vui lòng tạo danh mục và sản phẩm từ Bảng Quản Lý.</p>
-                ) : (
-                    menuData.map(category => (
+                {/* Danh sách món ăn */}
+                <div>
+                    {menuData.map(category => (
                         <div key={category.id} style={{ marginBottom: '30px' }}>
-                            <h2 style={{ borderBottom: '1px solid #d7ccc8', paddingBottom: '5px', color: '#4e342e' }}>{category.name}</h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                            <h2 style={{ color: '#4e342e', borderLeft: '5px solid #8d6e63', paddingLeft: '15px' }}>{category.name}</h2>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
                                 {category.products.map(product => (
-                                    <div key={product.id} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '15px', boxShadow: '2px 2px 5px rgba(0,0,0,0.1)', backgroundColor: '#fff' }}>
-                                        <h3 style={{ color: '#a1887f' }}>{product.name}</h3>
-                                        <p style={{ fontWeight: 'bold', color: '#5cb85c', fontSize: '1.1em' }}>
-                                            {product.price.toLocaleString('vi-VN')} VND
-                                        </p>
+                                    <div key={product.id} style={{ border: '1px solid #ddd', borderRadius: '12px', padding: '15px', textAlign: 'center', background: 'white', transition: '0.3s', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                                        <h3 style={{ margin: '10px 0' }}>{product.name}</h3>
+                                        <p style={{ color: '#28a745', fontWeight: 'bold', fontSize: '1.2em' }}>{product.price.toLocaleString('vi-VN')}đ</p>
                                         <button 
-                                            onClick={() => handleAddToCart(product)} 
-                                            style={{ width: '100%', backgroundColor: '#28a745', padding: '10px', marginTop: '10px' }}
+                                            onClick={() => handleAddToCart(product)}
+                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: '#8d6e63', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
                                         >
-                                            + Thêm vào Giỏ hàng
+                                            + Chọn món
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                    ))
-                )}
-            </div>
+                    ))}
+                </div>
 
-            {/* Cột 2: Giỏ hàng và Thanh toán */}
-            <div style={{ position: 'sticky', top: '20px', padding: '20px', border: '2px solid #a1887f', borderRadius: '10px', backgroundColor: '#f9f9f9', height: 'fit-content' }}>
-                <h2 style={{ color: '#4e342e', borderBottom: '1px solid #d7ccc8', paddingBottom: '10px' }}>🛒 Giỏ Hàng ({cart.length} món)</h2>
-                
-                {message && (
-                    <p style={{ color: isError ? 'red' : 'green', fontWeight: 'bold', border: `1px solid ${isError ? 'red' : 'green'}`, padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
-                        {message}
-                    </p>
-                )}
+                {/* Giỏ hàng bên phải */}
+                <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '15px', border: '1px solid #dee2e6', height: 'fit-content', position: 'sticky', top: '20px' }}>
+                    <h2 style={{ marginTop: 0, textAlign: 'center' }}>🛒 Đơn hàng</h2>
+                    
+                    {message && (
+                        <div style={{ padding: '15px', borderRadius: '8px', marginBottom: '15px', background: isError ? '#f8d7da' : '#d4edda', color: isError ? '#721c24' : '#155724', fontWeight: 'bold', textAlign: 'center' }}>
+                            {message}
+                        </div>
+                    )}
 
-                {cart.length === 0 ? (
-                    <p style={{ fontStyle: 'italic', color: '#888' }}>Giỏ hàng trống.</p>
-                ) : (
-                    <ul style={{ listStyleType: 'none', padding: 0 }}>
-                        {cart.map(item => (
-                            <li key={item.product_id} style={{ borderBottom: '1px dotted #ccc', padding: '10px 0' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <strong>{item.product_name}</strong>
-                                    <span style={{ fontWeight: 'bold' }}>{(item.unit_price * item.quantity).toLocaleString('vi-VN')} VND</span>
+                    {cart.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: '#6c757d', padding: '40px 0' }}>Giỏ hàng đang trống.<br/>Mời quý khách chọn món!</p>
+                    ) : (
+                        <>
+                            {cart.map(item => (
+                                <div key={item.product_id} style={{ borderBottom: '1px solid #ddd', padding: '10px 0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                                        <span>{item.product_name}</span>
+                                        <span>{(item.unit_price * item.quantity).toLocaleString('vi-VN')}đ</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', marginTop: '10px' }}>
+                                        <button onClick={() => updateQuantity(item.product_id, -1)} style={{ width: '25px', height: '25px', borderRadius: '50%', border: '1px solid #ddd' }}>-</button>
+                                        <span style={{ margin: '0 15px', fontWeight: 'bold' }}>{item.quantity}</span>
+                                        <button onClick={() => updateQuantity(item.product_id, 1)} style={{ width: '25px', height: '25px', borderRadius: '50%', border: '1px solid #ddd' }}>+</button>
+                                        <button onClick={() => setCart(cart.filter(i => i.product_id !== item.product_id))} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer' }}>Xóa</button>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Ghi chú (đá, đường...)" 
+                                        style={{ width: '100%', marginTop: '8px', padding: '5px', borderRadius: '4px', border: '1px solid #eee', fontSize: '0.85em' }}
+                                        value={item.notes}
+                                        onChange={(e) => {
+                                            const newCart = [...cart];
+                                            newCart.find(i => i.product_id === item.product_id).notes = e.target.value;
+                                            setCart(newCart);
+                                        }}
+                                    />
                                 </div>
-                                <p style={{ fontSize: '0.9em', color: '#666', margin: '5px 0' }}>Giá: {item.unit_price.toLocaleString('vi-VN')} VND</p>
-                                
-                                <div style={{ display: 'flex', alignItems: 'center', marginTop: '5px' }}>
-                                    <span style={{ marginRight: '10px' }}>SL:</span>
-                                    <button onClick={() => updateQuantity(item.product_id, -1)} style={{ padding: '3px 8px', backgroundColor: '#dc3545', marginRight: '5px' }}>-</button>
-                                    <span style={{ fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
-                                    <button onClick={() => updateQuantity(item.product_id, 1)} style={{ padding: '3px 8px', backgroundColor: '#28a745', marginLeft: '5px' }}>+</button>
-                                    <button onClick={() => removeFromCart(item.product_id)} style={{ padding: '3px 8px', backgroundColor: '#6c757d', marginLeft: 'auto' }}>Xóa</button>
+                            ))}
+                            <div style={{ marginTop: '20px', borderTop: '2px solid #4e342e', paddingTop: '15px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.4em', fontWeight: 'bold', color: '#4e342e' }}>
+                                    <span>TỔNG CỘNG:</span>
+                                    <span>{cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0).toLocaleString('vi-VN')}đ</span>
                                 </div>
-
-                                <textarea 
-                                    placeholder="Ghi chú (ít đường, nhiều đá...)"
-                                    value={item.notes}
-                                    onChange={(e) => updateNotes(item.product_id, e.target.value)}
-                                    style={{ width: '100%', marginTop: '10px', padding: '5px', borderRadius: '3px', border: '1px solid #ccc' }}
-                                />
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                
-                <h3 style={{ marginTop: '20px', borderTop: '2px solid #a1887f', paddingTop: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>TỔNG CỘNG:</span>
-                    <span style={{ color: '#dc3545', fontSize: '1.5em' }}>{totalAmount.toLocaleString('vi-VN')} VND</span>
-                </h3>
-
-                <button 
-                    onClick={handlePlaceOrder} 
-                    disabled={cart.length === 0}
-                    style={{ width: '100%', backgroundColor: '#dc3545', padding: '15px', fontSize: '1.2em', marginTop: '15px' }}
-                >
-                    ✅ Đặt Hàng & Thanh Toán (Tiền Mặt)
-                </button>
+                                <button 
+                                    onClick={handlePlaceOrder}
+                                    style={{ width: '100%', marginTop: '15px', padding: '15px', borderRadius: '10px', border: 'none', background: '#28a745', color: 'white', fontSize: '1.2em', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(40, 167, 69, 0.3)' }}
+                                >
+                                    ĐẶT MÓN NGAY ✅
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
