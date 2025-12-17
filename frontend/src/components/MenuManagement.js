@@ -29,7 +29,8 @@ const MenuManagement = () => {
     const userRole = localStorage.getItem('user_role');
 
     const [newCategoryName, setNewCategoryName] = useState('');
-    const [newProduct, setNewProduct] = useState({ name: '', price: '', category_id: '' });
+    // Cập nhật state để chứa thêm image_url
+    const [newProduct, setNewProduct] = useState({ name: '', price: '', category_id: '', image_url: '' });
 
     useEffect(() => {
         if (!token || userRole !== 'manager') {
@@ -108,12 +109,13 @@ const MenuManagement = () => {
                 body: JSON.stringify({
                     name: newProduct.name,
                     price: parseFloat(newProduct.price),
-                    category_id: parseInt(newProduct.category_id)
+                    category_id: parseInt(newProduct.category_id),
+                    image_url: newProduct.image_url // Gửi link ảnh lên server
                 }),
             });
             if (res.ok) {
                 setMessage("Thêm món thành công"); setIsError(false);
-                setNewProduct({ name: '', price: '', category_id: '' });
+                setNewProduct({ name: '', price: '', category_id: '', image_url: '' });
                 fetchMenuData();
             }
         } catch (err) { setMessage("Lỗi kết nối."); setIsError(true); }
@@ -122,13 +124,19 @@ const MenuManagement = () => {
     const handleEditProduct = async (product) => {
         const newName = prompt("Tên sản phẩm mới:", product.name);
         const newPrice = prompt("Giá mới:", product.price);
-        if (!newName || !newPrice) return;
+        const newImg = prompt("Link hình ảnh mới:", product.image_url || '');
+        
+        if (newName === null || newPrice === null) return; // Nếu nhấn cancel
 
         try {
             const res = await fetch(`${API_BASE_URL}/products/${product.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ name: newName, price: parseFloat(newPrice) }),
+                body: JSON.stringify({ 
+                    name: newName, 
+                    price: parseFloat(newPrice),
+                    image_url: newImg 
+                }),
             });
             if (res.ok) fetchMenuData();
         } catch (err) { alert("Lỗi cập nhật."); }
@@ -160,7 +168,6 @@ const MenuManagement = () => {
             <StatusMessage message={message} isError={isError} />
 
             <div className="admin-grid">
-                {/* BÊN TRÁI: BIỂU MẪU NHẬP */}
                 <aside className="admin-sidebar">
                     <div className="card-form">
                         <h4>📂 Danh mục mới</h4>
@@ -172,6 +179,9 @@ const MenuManagement = () => {
                         <h4>☕ Thêm món ăn</h4>
                         <input type="text" placeholder="Tên món..." value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} />
                         <input type="number" placeholder="Giá tiền..." value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} />
+                        {/* Ô NHẬP LINK ẢNH MỚI */}
+                        <input type="text" placeholder="Link hình ảnh (URL)..." value={newProduct.image_url} onChange={(e) => setNewProduct({...newProduct, image_url: e.target.value})} />
+                        
                         <select value={newProduct.category_id} onChange={(e) => setNewProduct({...newProduct, category_id: e.target.value})}>
                             <option value="">Chọn danh mục</option>
                             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -180,7 +190,6 @@ const MenuManagement = () => {
                     </div>
                 </aside>
 
-                {/* BÊN PHẢI: DANH SÁCH CHI TIẾT */}
                 <main className="admin-main">
                     {menuData.map(cat => (
                         <div key={cat.id} className="category-block">
@@ -194,7 +203,10 @@ const MenuManagement = () => {
                                 <tbody>
                                     {cat.products.map(p => (
                                         <tr key={p.id}>
-                                            <td style={{width: '50%'}}><strong>{p.name}</strong></td>
+                                            <td style={{width: '80px'}}>
+                                                <img src={p.image_url || 'https://via.placeholder.com/50'} alt="" style={{width: '50px', height: '50px', borderRadius: '4px', objectFit: 'cover'}} />
+                                            </td>
+                                            <td style={{width: '40%'}}><strong>{p.name}</strong></td>
                                             <td style={{color: '#e67e22', fontWeight: 'bold'}}>{p.price.toLocaleString()}đ</td>
                                             <td style={{textAlign: 'right'}}>
                                                 <button className="btn-admin btn-edit" onClick={() => handleEditProduct(p)} style={{marginRight: '8px'}}>Sửa</button>

@@ -102,7 +102,6 @@ const GuestOrderKiosk = () => {
     return (
         <div className="kiosk-page-wrapper">
             <div className="kiosk-container">
-                {/* Header */}
                 <header className="kiosk-header">
                     <div>
                         <h1>REAK SMAAY COFFEE ☕</h1>
@@ -114,7 +113,6 @@ const GuestOrderKiosk = () => {
                 </header>
 
                 <div className="kiosk-content">
-                    {/* Danh sách món ăn */}
                     <main className="menu-list">
                         {menuData.map(category => (
                             <div key={category.id} className="category-block">
@@ -122,11 +120,23 @@ const GuestOrderKiosk = () => {
                                 <div className="product-grid">
                                     {category.products.map(product => (
                                         <div key={product.id} className="product-card">
-                                            <h3>{product.name}</h3>
-                                            <p className="product-price">{product.price.toLocaleString('vi-VN')}đ</p>
-                                            <button className="select-btn" onClick={() => handleAddToCart(product)}>
-                                                + Thêm món
-                                            </button>
+                                            {/* PHẦN HIỂN THỊ HÌNH ẢNH MỚI */}
+                                            <div className="product-image-box">
+                                                <img 
+                                                    src={product.image_url || 'https://via.placeholder.com/200x150?text=No+Image'} 
+                                                    alt={product.name} 
+                                                    className="product-img"
+                                                    onError={(e) => { e.target.src = 'https://via.placeholder.com/200x150?text=Image+Error'; }}
+                                                />
+                                            </div>
+                                            
+                                            <div className="product-info">
+                                                <h3>{product.name}</h3>
+                                                <p className="product-price">{product.price.toLocaleString('vi-VN')}đ</p>
+                                                <button className="select-btn" onClick={() => handleAddToCart(product)}>
+                                                    + Thêm món
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -134,7 +144,6 @@ const GuestOrderKiosk = () => {
                         ))}
                     </main>
 
-                    {/* Giỏ hàng Sidebar */}
                     <aside className="cart-panel">
                         <h2 style={{textAlign: 'center', margin: '0 0 20px 0'}}>🛒 Đơn hàng</h2>
                         

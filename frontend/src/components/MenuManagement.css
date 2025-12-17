@@ -49,7 +49,7 @@
     margin-bottom: 12px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    box-sizing: border-box; /* Quan trọng cho responsive */
+    box-sizing: border-box;
 }
 
 /* Danh sách hiển thị bên phải */
@@ -78,10 +78,28 @@
 .product-table td {
     padding: 15px 10px;
     border-bottom: 1px solid #f1f1f1;
+    vertical-align: middle; /* Căn giữa nội dung theo chiều dọc */
 }
 
 .product-table tr:last-child td {
     border-bottom: none;
+}
+
+/* Style cho ảnh thu nhỏ trong bảng quản trị */
+.product-table img {
+    border: 1px solid #eee;
+    background-color: #f9f9f9;
+    display: block;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: zoom-in;
+}
+
+/* Hiệu ứng phóng lớn ảnh khi di chuột vào (trang quản trị) */
+.product-table img:hover {
+    transform: scale(2.5); 
+    position: relative;
+    z-index: 99;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
 /* Nút bấm */
@@ -102,6 +120,22 @@
 .btn-delete { background-color: #e74c3c; color: white; font-size: 12px; }
 .btn-edit { background-color: #f1c40f; color: #2c3e50; }
 
+.btn-delete:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+/* Trạng thái Status Message */
+.status-msg {
+    font-weight: 500;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Responsive cho Mobile */
 @media (max-width: 900px) {
     .admin-grid {
@@ -117,7 +151,7 @@
 
 @media (max-width: 480px) {
     .product-table td {
-        display: block; /* Chuyển table thành card trên điện thoại nhỏ */
+        display: block; 
         width: 100%;
         text-align: left !important;
         padding: 5px 0;
@@ -126,5 +160,8 @@
         display: block;
         padding: 15px 0;
         border-bottom: 1px solid #eee;
+    }
+    .product-table img {
+        margin-bottom: 10px;
     }
 }

@@ -1,6 +1,6 @@
 /* src/components/GuestOrderKiosk.css */
 
-/* Bao bọc toàn bộ để tránh xung đột với index.css hay Login.css */
+/* Bao bọc toàn bộ để tránh xung đột với các trang khác */
 .kiosk-page-wrapper {
     background-color: #f4f1ea;
     min-height: 100vh;
@@ -79,14 +79,17 @@
     gap: 20px;
 }
 
+/* Product Card - Cập nhật cho phần có ảnh */
 .product-card {
     background: white;
     border-radius: 15px;
-    padding: 20px;
     text-align: center;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     transition: transform 0.2s, box-shadow 0.2s;
     border: 1px solid transparent;
+    overflow: hidden; /* Cần thiết để ảnh không tràn khỏi góc bo */
+    display: flex;
+    flex-direction: column;
 }
 
 .product-card:hover {
@@ -95,15 +98,40 @@
     border-color: #8d6e63;
 }
 
-.product-card h3 {
-    margin: 10px 0;
+/* Khung chứa ảnh */
+.product-image-box {
+    width: 100%;
+    height: 160px;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+.product-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.product-card:hover .product-img {
+    transform: scale(1.1);
+}
+
+/* Thông tin sản phẩm bên dưới ảnh */
+.product-info {
+    padding: 15px;
+}
+
+.product-info h3 {
+    margin: 5px 0;
     font-size: 18px;
+    color: #4e342e;
 }
 
 .product-price {
     color: #28a745;
     font-weight: 800;
-    font-size: 20px;
+    font-size: 19px;
     margin: 10px 0;
 }
 
@@ -123,7 +151,7 @@
     background: #5d4037;
 }
 
-/* Giỏ hàng */
+/* Giỏ hàng Sidebar */
 .cart-panel {
     background: white;
     padding: 25px;
@@ -201,11 +229,6 @@
     font-weight: bold;
     cursor: pointer;
     box-shadow: 0 6px 15px rgba(40, 167, 69, 0.3);
-}
-
-.checkout-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
 }
 
 /* Responsive */

@@ -1,0 +1,233 @@
+/* src/components/Menu.css */
+
+/* Container chính */
+.menu-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 30px;
+    background-color: #f8fafc;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Header và tiêu đề */
+.menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 25px;
+    margin-bottom: 30px;
+}
+
+.header-title h1 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.welcome-text {
+    color: #64748b;
+    margin-top: 8px;
+    font-size: 1rem;
+}
+
+/* Nhóm nút bấm điều hướng */
+.button-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* Base Button Style */
+.btn {
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: white;
+    font-size: 0.9rem;
+}
+
+.btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    filter: brightness(1.1);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* Màu sắc các loại nút */
+.btn-dashboard { background-color: #6366f1; } /* Indigo */
+.btn-manager { background-color: #475569; }   /* Slate */
+.btn-menu { background-color: #94a3b8; }      /* Slate Light */
+.btn-order-list { background-color: #3b82f6; } /* Blue */
+.btn-create-order { background-color: #10b981; } /* Emerald */
+.btn-logout { background-color: #ef4444; }    /* Red */
+
+/* Thanh tìm kiếm */
+.search-box {
+    margin-bottom: 35px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 16px 24px;
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Danh mục sản phẩm */
+.category-section {
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 14px;
+    margin-bottom: 35px;
+    border: 1px solid #f1f5f9;
+}
+
+.category-title {
+    color: #334155;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    border-left: 6px solid #3b82f6;
+    padding-left: 15px;
+    display: flex;
+    align-items: center;
+    font-weight: 700;
+}
+
+.category-count {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-left: 12px;
+}
+
+/* Grid sản phẩm */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+.product-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.product-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    background-color: #f8fafc;
+}
+
+/* Thông tin sản phẩm & Ảnh */
+.product-main-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.product-thumb {
+    width: 70px;
+    height: 70px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #f1f5f9;
+}
+
+.product-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.product-item:hover .product-thumb img {
+    transform: scale(1.15);
+}
+
+.product-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.product-name {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+
+.product-id {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+}
+
+.product-price {
+    font-weight: 800;
+    color: #059669; /* Emerald Green */
+    font-size: 1.2rem;
+    padding-left: 10px;
+}
+
+/* Trạng thái trống */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+    font-size: 1.1rem;
+}
+
+/* Responsive cho điện thoại */
+@media (max-width: 768px) {
+    .menu-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .button-group {
+        justify-content: center;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    .btn {
+        flex: 1 1 45%;
+        justify-content: center;
+    }
+
+    .product-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './OrderCreation.css'; // Đảm bảo import đúng tên file css
+import './OrderCreation.css'; 
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
@@ -77,27 +77,37 @@ const OrderCreation = () => {
         }
     };
 
-    if (loading) return <div className="order-creation-wrapper">Đang tải menu...</div>;
+    if (loading) return <div className="order-creation-wrapper">☕ Đang tải menu...</div>;
 
     return (
         <div className="order-creation-wrapper">
             <header className="menu-header">
                 <div className="header-title">
                     <h1>☕ Tạo Đơn Hàng Mới</h1>
-                    <p className="welcome-text">Giao diện dành riêng cho nhân viên.</p>
+                    <p className="welcome-text">Giao diện POS dành riêng cho nhân viên.</p>
                 </div>
                 <button className="btn-menu" onClick={() => navigate('/menu')}>← Menu chính</button>
             </header>
 
             <div className="order-content-layout">
-                {/* BÊN TRÁI: DANH SÁCH MÓN */}
+                {/* BÊN TRÁI: DANH SÁCH MÓN CÓ ẢNH */}
                 <div className="category-section">
                     <h3 className="category-title">Thực đơn tại quầy</h3>
                     <div className="product-grid">
                         {products.map(p => (
                             <div key={p.id} className="product-item" onClick={() => addToCart(p)}>
-                                <div style={{ fontWeight: 'bold', marginBottom: '5px', textAlign: 'center' }}>{p.name}</div>
-                                <div style={{ color: '#e67e22', fontWeight: 'bold' }}>{p.price.toLocaleString()}đ</div>
+                                {/* THÊM HÌNH ẢNH MINH HỌA */}
+                                <div className="product-thumb-pos">
+                                    <img 
+                                        src={p.image_url || 'https://via.placeholder.com/100?text=Cafe'} 
+                                        alt={p.name}
+                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/100?text=No+Img'; }}
+                                    />
+                                </div>
+                                <div className="product-info-pos">
+                                    <div className="product-name-pos">{p.name}</div>
+                                    <div className="product-price-pos">{p.price.toLocaleString()}đ</div>
+                                </div>
                                 <button className="btn-add-quick">+</button>
                             </div>
                         ))}
@@ -108,24 +118,24 @@ const OrderCreation = () => {
                 <aside className="cart-sidebar">
                     <h3 className="category-title">🛒 Chi tiết đơn hàng</h3>
                     {cart.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                            <p style={{ color: '#bdc3c7', fontSize: '3rem', margin: 0 }}>🛒</p>
-                            <p style={{ color: '#888' }}>Chưa có món nào được chọn</p>
+                        <div className="cart-empty">
+                            <p className="cart-icon-large">🛒</p>
+                            <p>Chưa có món nào được chọn</p>
                         </div>
                     ) : (
                         <>
                             <div className="cart-items">
                                 {cart.map(item => (
-                                    <div key={item.product_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #f8f9fa' }}>
-                                        <div>
-                                            <div style={{ fontWeight: '600' }}>{item.name}</div>
-                                            <div style={{ fontSize: '0.85rem', color: '#7f8c8d' }}>
+                                    <div key={item.product_id} className="cart-line-item">
+                                        <div className="cart-item-details">
+                                            <div className="cart-item-name">{item.name}</div>
+                                            <div className="cart-item-sub">
                                                 {item.quantity} x {item.unit_price.toLocaleString()}đ
                                             </div>
                                         </div>
                                         <button 
+                                            className="btn-remove-item"
                                             onClick={(e) => { e.stopPropagation(); removeFromCart(item.product_id); }} 
-                                            style={{ background: '#fff', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.8rem' }}
                                         >
                                             Xóa
                                         </button>
@@ -134,11 +144,11 @@ const OrderCreation = () => {
                             </div>
                             
                             <div className="cart-footer">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.4rem', fontWeight: '800', marginBottom: '20px', color: '#2c3e50' }}>
-                                    <span>Tổng:</span>
+                                <div className="cart-total-display">
+                                    <span>Tổng cộng:</span>
                                     <span>{totalBill.toLocaleString()}đ</span>
                                 </div>
-                                <button className="btn-confirm" onClick={handleSubmitOrder}>
+                                <button className="btn-confirm-pos" onClick={handleSubmitOrder}>
                                     XÁC NHẬN ĐƠN ✅
                                 </button>
                             </div>

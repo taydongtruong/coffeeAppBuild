@@ -1,0 +1,165 @@
+/* src/components/OrderCreation.css */
+
+.order-creation-wrapper {
+    max-width: 1300px;
+    margin: 20px auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+}
+
+.order-content-layout {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+/* Lưới sản phẩm POS */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px;
+}
+
+.product-item {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #eee;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-item:hover {
+    border-color: #3498db;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.product-thumb-pos {
+    width: 100%;
+    height: 100px;
+    background: #f9f9f9;
+}
+
+.product-thumb-pos img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-info-pos {
+    padding: 10px;
+    text-align: center;
+}
+
+.product-name-pos {
+    font-weight: 600;
+    font-size: 0.9rem;
+    height: 2.4em;
+    overflow: hidden;
+    color: #2c3e50;
+}
+
+.product-price-pos {
+    color: #e67e22;
+    font-weight: 800;
+    margin-top: 5px;
+}
+
+.btn-add-quick {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(52, 152, 219, 0.9);
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Sidebar Giỏ hàng */
+.cart-sidebar {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+}
+
+.cart-line-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.cart-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.cart-item-sub {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+}
+
+.btn-remove-item {
+    background: #fff;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.btn-remove-item:hover {
+    background: #e74c3c;
+    color: white;
+}
+
+.cart-total-display {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.5rem;
+    font-weight: 900;
+    margin: 20px 0;
+    color: #2c3e50;
+}
+
+.btn-confirm-pos {
+    width: 100%;
+    padding: 15px;
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+}
+
+.btn-confirm-pos:hover {
+    background: #219150;
+}
+
+.cart-empty {
+    text-align: center;
+    padding: 50px 0;
+    color: #bdc3c7;
+}
+
+.cart-icon-large {
+    font-size: 4rem;
+    margin: 0;
+}

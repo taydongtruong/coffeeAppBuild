@@ -1,0 +1,132 @@
+/* src/components/OrderList.css */
+
+.order-list-wrapper {
+    background-color: #f0f2f5;
+    min-height: 100vh;
+    padding: 30px;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* Header fix: Đảm bảo dàn hàng ngang và hiển thị nút */
+.order-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 20px 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.header-title h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #2c3e50;
+}
+
+.header-title p {
+    margin: 5px 0 0 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* Nút Menu chính */
+.btn-menu {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid #34495e;
+    background-color: #34495e;
+    color: white;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-menu:hover {
+    background-color: #2c3e50;
+    transform: scale(1.05);
+}
+
+.order-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.order-id { font-weight: 800; font-size: 1.1rem; }
+.order-meta { font-size: 0.85rem; color: #7f8c8d; margin-top: 5px; }
+.order-creator { margin-left: 15px; }
+
+.price-tag {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #27ae60;
+    margin-bottom: 5px;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.items-box {
+    background: #fdfdfd;
+    border: 1px solid #f1f1f1;
+    border-radius: 8px;
+    padding: 10px 15px;
+}
+
+.item-row-with-img {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px dashed #eee;
+}
+
+.order-item-img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-right: 12px;
+}
+
+.item-main { display: flex; align-items: center; }
+
+.status-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.btn-status {
+    border: none;
+    padding: 8px 15px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-status:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.no-orders {
+    text-align: center;
+    padding: 50px;
+    background: white;
+    border-radius: 12px;
+}
