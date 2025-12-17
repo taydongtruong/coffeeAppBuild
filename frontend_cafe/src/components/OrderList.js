@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Menu.css'; // Đảm bảo bạn đã có file CSS này để giao diện đẹp mắt
+import './OrderList.css'; 
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 const VALID_STATUSES = ['pending', 'completed', 'cancelled'];
@@ -14,7 +14,6 @@ const OrderList = () => {
     const token = localStorage.getItem('access_token');
     const userRole = localStorage.getItem('user_role');
 
-    // Hàm lấy danh sách đơn hàng
     const fetchOrders = async () => {
         if (!token || userRole !== 'manager') {
             navigate('/');
@@ -43,10 +42,8 @@ const OrderList = () => {
 
     useEffect(() => {
         fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Hàm cập nhật trạng thái đơn hàng (Khớp với Route PUT trong app.py)
     const handleUpdateStatus = async (orderId, newStatus) => {
         try {
             const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
@@ -59,7 +56,6 @@ const OrderList = () => {
             });
 
             if (response.ok) {
-                // Tải lại danh sách để cập nhật giao diện ngay lập tức
                 fetchOrders(); 
             } else {
                 const errorData = await response.json();
@@ -70,80 +66,80 @@ const OrderList = () => {
         }
     };
 
-    // Hàm chuyển đổi nhãn trạng thái sang tiếng Việt và Icon
-    const getStatusInfo = (status) => {
+    const getStatusStyle = (status) => {
         switch (status) {
-            case 'completed': return { label: '✅ HOÀN THÀNH', color: '#28a745' };
-            case 'cancelled': return { label: '❌ ĐÃ HỦY', color: '#dc3545' };
-            default: return { label: '⏳ ĐANG CHỜ', color: '#ffc107' };
+            case 'completed': return { label: 'Hoàn thành', color: '#28a745', bg: '#d4edda' };
+            case 'cancelled': return { label: 'Đã hủy', color: '#dc3545', bg: '#f8d7da' };
+            default: return { label: 'Đang chờ', color: '#f39c12', bg: '#fef5e7' };
         }
     };
 
-    if (loading) return <div className="menu-container"><div className="empty-state">Đang tải đơn hàng...</div></div>;
-    if (error) return <div className="menu-container" style={{ color: 'red', textAlign: 'center' }}>{error}</div>;
+    if (loading) return <div className="order-list-wrapper">Đang tải dữ liệu...</div>;
+    if (error) return <div className="order-list-wrapper" style={{ color: 'red' }}>{error}</div>;
 
     return (
-        <div className="menu-container">
-            <header className="menu-header">
-                <div className="header-title">
-                    <h1>📄 Quản Lý Đơn Hàng</h1>
-                    <p className="welcome-text">Tổng cộng <strong>{orders.length}</strong> đơn hàng đã được ghi nhận.</p>
+        <div className="order-list-wrapper">
+            <header className="menu-header" style={{display: 'flex', justifyContent: 'space-between', marginBottom: '30px', background: 'white', padding: '20px', borderRadius: '12px'}}>
+                <div>
+                    <h1 style={{margin: 0}}>📋 Quản Lý Đơn Hàng</h1>
+                    <p style={{color: '#666', margin: '5px 0 0 0'}}>Theo dõi và cập nhật trạng thái phục vụ</p>
                 </div>
-                <button className="btn btn-menu" onClick={() => navigate('/menu')}>← Quay lại Menu</button>
+                <button className="btn-menu" onClick={() => navigate('/menu')} style={{padding: '10px 20px', cursor: 'pointer'}}>← Menu chính</button>
             </header>
 
             {orders.length === 0 ? (
-                <div className="empty-state">Hệ thống chưa ghi nhận đơn hàng nào.</div>
+                <div style={{textAlign: 'center', padding: '50px', background: 'white', borderRadius: '12px'}}>Hệ thống chưa có đơn hàng nào.</div>
             ) : (
-                <div className="product-grid" style={{ gridTemplateColumns: '1fr' }}>
+                <div className="orders-container">
                     {orders.map(order => {
-                        const statusInfo = getStatusInfo(order.order_status);
+                        const style = getStatusStyle(order.order_status);
                         return (
-                            <div key={order.id} className="category-section" style={{ borderLeft: `8px solid ${statusInfo.color}` }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h3 style={{ margin: 0 }}>Đơn hàng #{order.id}</h3>
-                                        <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#666' }}>
-                                            Ngày: {new Date(order.created_at).toLocaleString('vi-VN')}
-                                        </p>
-                                        <p style={{ margin: '5px 0' }}>Bán bởi: <strong>{order.created_by}</strong></p>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div className="product-price" style={{ fontSize: '1.4rem', marginBottom: '5px' }}>
-                                            {order.total_amount.toLocaleString('vi-VN')} đ
+                            <div key={order.id} className="order-card" style={{ borderLeft: `8px solid ${style.color}` }}>
+                                <div className="order-header">
+                                    <div className="order-info">
+                                        <span className="order-id">Đơn hàng #{order.id}</span>
+                                        <div className="order-meta">
+                                            <span>⏰ {new Date(order.created_at).toLocaleString('vi-VN')}</span>
+                                            <span style={{marginLeft: '15px'}}>👤 Người tạo: <strong>{order.created_by}</strong></span>
                                         </div>
-                                        <span style={{ fontWeight: 'bold', color: statusInfo.color }}>{statusInfo.label}</span>
+                                    </div>
+                                    <div style={{textAlign: 'right'}}>
+                                        <div className="price-tag">{order.total_amount.toLocaleString('vi-VN')}đ</div>
+                                        <span className="status-badge" style={{color: style.color, backgroundColor: style.bg}}>
+                                            {style.label}
+                                        </span>
                                     </div>
                                 </div>
 
-                                <div style={{ margin: '15px 0', padding: '10px', background: '#f8f9fa', borderRadius: '8px' }}>
-                                    <h4 style={{ marginTop: 0, fontSize: '1rem', borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Chi tiết món:</h4>
+                                <div className="items-box">
                                     {order.items.map((item, idx) => (
-                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                                        <div key={idx} className="item-row">
                                             <span>{item.quantity} x <strong>{item.product_name}</strong></span>
-                                            <span>{(item.quantity * item.unit_price).toLocaleString('vi-VN')} đ</span>
+                                            <span>{(item.quantity * item.unit_price).toLocaleString('vi-VN')}đ</span>
                                         </div>
                                     ))}
                                 </div>
 
-                                <div className="button-group" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <label style={{ fontSize: '0.9rem', alignSelf: 'center' }}>Cập nhật trạng thái:</label>
-                                    {VALID_STATUSES.map(status => (
-                                        <button 
-                                            key={status}
-                                            className="btn"
-                                            style={{ 
-                                                fontSize: '0.75rem', 
-                                                padding: '5px 10px',
-                                                backgroundColor: order.order_status === status ? '#adb5bd' : 
-                                                               (status === 'completed' ? '#28a745' : status === 'cancelled' ? '#dc3545' : '#ffc107')
-                                            }}
-                                            onClick={() => handleUpdateStatus(order.id, status)}
-                                            disabled={order.order_status === status}
-                                        >
-                                            {status === 'pending' ? 'CHỜ' : status === 'completed' ? 'HOÀN THÀNH' : 'HỦY'}
-                                        </button>
-                                    ))}
+                                <div className="status-actions">
+                                    <span style={{fontSize: '0.85rem', color: '#95a5a6', fontWeight: 'bold'}}>CHUYỂN TRẠNG THÁI:</span>
+                                    <button 
+                                        className="btn-status" 
+                                        style={{backgroundColor: '#f1c40f', color: 'white'}}
+                                        onClick={() => handleUpdateStatus(order.id, 'pending')}
+                                        disabled={order.order_status === 'pending'}
+                                    >CHỜ</button>
+                                    <button 
+                                        className="btn-status" 
+                                        style={{backgroundColor: '#2ecc71', color: 'white'}}
+                                        onClick={() => handleUpdateStatus(order.id, 'completed')}
+                                        disabled={order.order_status === 'completed'}
+                                    >HOÀN THÀNH</button>
+                                    <button 
+                                        className="btn-status" 
+                                        style={{backgroundColor: '#e74c3c', color: 'white'}}
+                                        onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                                        disabled={order.order_status === 'cancelled'}
+                                    >HỦY</button>
                                 </div>
                             </div>
                         );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Menu.css';
+import './OrderCreation.css'; // Đảm bảo import đúng tên file css
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
@@ -28,7 +28,6 @@ const OrderCreation = () => {
         }
     };
 
-    // Thêm món vào giỏ (Đảm bảo lưu product_id và unit_price để khớp app.py)
     const addToCart = (product) => {
         setCart(prevCart => {
             const existingItem = prevCart.find(item => item.product_id === product.id);
@@ -50,7 +49,6 @@ const OrderCreation = () => {
         setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
     };
 
-    // Tính tổng bill dựa trên unit_price
     const totalBill = cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 
     const handleSubmitOrder = async () => {
@@ -63,14 +61,12 @@ const OrderCreation = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                // Gửi toàn bộ cart (đã có product_id, quantity, unit_price)
                 body: JSON.stringify({ items: cart })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                // app.py trả về { order: { id: ... } }
                 alert(`🎉 Tạo đơn hàng thành công! ID: #${data.order.id}`);
                 setCart([]); 
             } else {
@@ -81,53 +77,55 @@ const OrderCreation = () => {
         }
     };
 
-    if (loading) return <div className="menu-container">Đang tải menu...</div>;
+    if (loading) return <div className="order-creation-wrapper">Đang tải menu...</div>;
 
     return (
-        <div className="menu-container">
+        <div className="order-creation-wrapper">
             <header className="menu-header">
                 <div className="header-title">
                     <h1>☕ Tạo Đơn Hàng Mới</h1>
-                    <p className="welcome-text">Dành cho nhân viên phục vụ.</p>
+                    <p className="welcome-text">Giao diện dành riêng cho nhân viên.</p>
                 </div>
-                <button className="btn btn-menu" onClick={() => navigate('/menu')}>← Menu chính</button>
+                <button className="btn-menu" onClick={() => navigate('/menu')}>← Menu chính</button>
             </header>
 
-            <div className="order-content-layout" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '20px' }}>
-                
+            <div className="order-content-layout">
                 {/* BÊN TRÁI: DANH SÁCH MÓN */}
                 <div className="category-section">
-                    <h3 className="category-title">Menu Món Ăn</h3>
-                    <div className="product-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '15px' }}>
+                    <h3 className="category-title">Thực đơn tại quầy</h3>
+                    <div className="product-grid">
                         {products.map(p => (
-                            <div key={p.id} className="product-item" style={{ cursor: 'pointer', padding: '15px', border: '1px solid #ddd', borderRadius: '8px', textAlign: 'center' }} onClick={() => addToCart(p)}>
-                                <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{p.name}</div>
-                                <div style={{ color: '#d35400' }}>{p.price.toLocaleString()}đ</div>
-                                <button className="btn-add-quick" style={{ marginTop: '10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer' }}>+</button>
+                            <div key={p.id} className="product-item" onClick={() => addToCart(p)}>
+                                <div style={{ fontWeight: 'bold', marginBottom: '5px', textAlign: 'center' }}>{p.name}</div>
+                                <div style={{ color: '#e67e22', fontWeight: 'bold' }}>{p.price.toLocaleString()}đ</div>
+                                <button className="btn-add-quick">+</button>
                             </div>
                         ))}
                     </div>
                 </div>
 
                 {/* BÊN PHẢI: GIỎ HÀNG */}
-                <div className="cart-sidebar" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', position: 'sticky', top: '20px', height: 'fit-content' }}>
-                    <h3 className="category-title">🛒 Đơn hàng hiện tại</h3>
+                <aside className="cart-sidebar">
+                    <h3 className="category-title">🛒 Chi tiết đơn hàng</h3>
                     {cart.length === 0 ? (
-                        <p style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Chưa chọn món nào.</p>
+                        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                            <p style={{ color: '#bdc3c7', fontSize: '3rem', margin: 0 }}>🛒</p>
+                            <p style={{ color: '#888' }}>Chưa có món nào được chọn</p>
+                        </div>
                     ) : (
                         <>
-                            <div className="cart-items" style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
+                            <div className="cart-items">
                                 {cart.map(item => (
-                                    <div key={item.product_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #f0f0f0' }}>
+                                    <div key={item.product_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #f8f9fa' }}>
                                         <div>
-                                            <div style={{ fontWeight: 'bold' }}>{item.name}</div>
-                                            <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                                            <div style={{ fontWeight: '600' }}>{item.name}</div>
+                                            <div style={{ fontSize: '0.85rem', color: '#7f8c8d' }}>
                                                 {item.quantity} x {item.unit_price.toLocaleString()}đ
                                             </div>
                                         </div>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); removeFromCart(item.product_id); }} 
-                                            style={{ background: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 8px', cursor: 'pointer' }}
+                                            style={{ background: '#fff', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.8rem' }}
                                         >
                                             Xóa
                                         </button>
@@ -135,22 +133,18 @@ const OrderCreation = () => {
                                 ))}
                             </div>
                             
-                            <div className="cart-footer" style={{ borderTop: '2px solid #eee', paddingTop: '15px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '20px' }}>
+                            <div className="cart-footer">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.4rem', fontWeight: '800', marginBottom: '20px', color: '#2c3e50' }}>
                                     <span>Tổng:</span>
-                                    <span style={{ color: '#d35400' }}>{totalBill.toLocaleString()}đ</span>
+                                    <span>{totalBill.toLocaleString()}đ</span>
                                 </div>
-                                <button 
-                                    className="btn-confirm" 
-                                    style={{ width: '100%', padding: '15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer' }} 
-                                    onClick={handleSubmitOrder}
-                                >
-                                    XÁC NHẬN & IN HÓA ĐƠN
+                                <button className="btn-confirm" onClick={handleSubmitOrder}>
+                                    XÁC NHẬN ĐƠN ✅
                                 </button>
                             </div>
                         </>
                     )}
-                </div>
+                </aside>
             </div>
         </div>
     );
