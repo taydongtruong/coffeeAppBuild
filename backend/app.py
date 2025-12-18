@@ -11,15 +11,12 @@ from sqlalchemy import func
 app = Flask(__name__)
 
 # --- CẤU HÌNH HỆ THỐNG ---
-# Hỗ trợ cả SQLite (Local) và PostgreSQL (Render)
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///cafe_manager.db')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Bảo mật Key bằng biến môi trường
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secure_key_123')
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'default_jwt_secret_456')
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
@@ -68,11 +65,8 @@ class Product(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id, 
-            'name': self.name, 
-            'price': self.price, 
-            'image_url': self.image_url,
-            'category_id': self.category_id, 
+            'id': self.id, 'name': self.name, 'price': self.price, 
+            'image_url': self.image_url, 'category_id': self.category_id, 
             'is_available': self.is_available
         }
 
@@ -119,6 +113,10 @@ with app.app_context():
 
 # --- API ROUTES ---
 
+@app.route('/')
+def index():
+    return jsonify(message="Cafe API is Online", version="1.0"), 200
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -128,21 +126,57 @@ def login():
         return jsonify(user=user.to_dict(), access_token=access_token), 200
     return jsonify({"message": "Tài khoản hoặc mật khẩu không chính xác"}), 401
 
-@app.route('/api/users', methods=['GET', 'POST'])
-@manager_required()
-def manage_users():
+# --- ROUTES CHO CATEGORY (ĐÃ THÊM MỚI) ---
+@app.route('/api/categories', methods=['GET', 'POST'])
+def manage_categories():
     if request.method == 'POST':
+        verify_jwt_in_request()
         data = request.get_json()
-        if User.query.filter_by(username=data['username']).first():
-            return jsonify(message="Tên đăng nhập đã tồn tại"), 400
-        new_user = User(username=data['username'], full_name=data['full_name'], role=data.get('role', 'staff'))
-        new_user.set_password(data['password'])
-        db.session.add(new_user)
+        new_cat = Category(name=data['name'])
+        db.session.add(new_cat)
         db.session.commit()
-        return jsonify(user=new_user.to_dict()), 201
-    users = User.query.all()
-    return jsonify([u.to_dict() for u in users]), 200
+        return jsonify(category=new_cat.to_dict()), 201
+    return jsonify([c.to_dict() for c in Category.query.all()]), 200
 
+@app.route('/api/categories/<int:id>', methods=['DELETE'])
+@manager_required()
+def delete_category(id):
+    category = Category.query.get_or_404(id)
+    db.session.delete(category)
+    db.session.commit()
+    return jsonify(message="Xóa danh mục thành công"), 200
+
+# --- ROUTES CHO PRODUCT ---
+@app.route('/api/products', methods=['GET', 'POST'])
+def manage_products():
+    if request.method == 'POST':
+        verify_jwt_in_request()
+        data = request.get_json()
+        new_prod = Product(
+            name=data['name'], price=data['price'], 
+            image_url=data.get('image_url'), category_id=data['category_id']
+        )
+        db.session.add(new_prod)
+        db.session.commit()
+        return jsonify(product=new_prod.to_dict()), 201
+    return jsonify([p.to_dict() for p in Product.query.all()]), 200
+
+@app.route('/api/products/<int:id>', methods=['PUT', 'DELETE'])
+@manager_required()
+def update_delete_product(id):
+    product = Product.query.get_or_404(id)
+    if request.method == 'DELETE':
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify(message="Xóa sản phẩm thành công"), 200
+    data = request.get_json()
+    product.name = data.get('name', product.name)
+    product.price = data.get('price', product.price)
+    product.is_available = data.get('is_available', product.is_available)
+    db.session.commit()
+    return jsonify(product=product.to_dict()), 200
+
+# --- ROUTES CHO ORDER ---
 @app.route('/api/orders', methods=['GET', 'POST'])
 def manage_orders():
     if request.method == 'POST':
@@ -152,12 +186,10 @@ def manage_orders():
         items_data = data.get('items', [])
         if not items_data:
             return jsonify(message="Giỏ hàng trống"), 400
-
         total = sum(item.get('unit_price', 0) * item.get('quantity', 0) for item in items_data)
         new_order = Order(user_id=u_id, total_amount=total)
         db.session.add(new_order)
         db.session.flush()
-
         for i in items_data:
             db.session.add(OrderItem(
                 order_id=new_order.id, product_id=i['product_id'],
@@ -165,80 +197,45 @@ def manage_orders():
             ))
         db.session.commit()
         return jsonify(order={'id': new_order.id}), 201
-
     orders = Order.query.order_by(Order.created_at.desc()).all()
     result = []
     for o in orders:
         result.append({
-            'id': o.id,
-            'total_amount': o.total_amount,
-            'order_status': o.order_status,
+            'id': o.id, 'total_amount': o.total_amount, 'order_status': o.order_status,
             'created_at': o.created_at.isoformat(),
             'created_by': o.creator.full_name if o.creator else "Khách vãng lai",
-            'items': [
-                {
-                    'product_name': i.product.name, 
-                    'quantity': i.quantity, 
-                    'unit_price': i.unit_price,
-                    'image_url': i.product.image_url 
-                } for i in o.items
-            ]
+            'items': [{'product_name': i.product.name, 'quantity': i.quantity, 'unit_price': i.unit_price} for i in o.items]
         })
     return jsonify(result), 200
 
-@app.route('/api/products', methods=['GET', 'POST'])
-def manage_products():
-    if request.method == 'POST':
-        verify_jwt_in_request()
-        data = request.get_json()
-        new_prod = Product(
-            name=data['name'], 
-            price=data['price'], 
-            image_url=data.get('image_url'),
-            category_id=data['category_id']
-        )
-        db.session.add(new_prod)
-        db.session.commit()
-        return jsonify(product=new_prod.to_dict()), 201
-    return jsonify([p.to_dict() for p in Product.query.all()]), 200
+@app.route('/api/orders/<int:id>', methods=['PUT'])
+@manager_required()
+def update_order_status(id):
+    order = Order.query.get_or_404(id)
+    data = request.get_json()
+    order.order_status = data.get('order_status', order.order_status)
+    db.session.commit()
+    return jsonify(message="Cập nhật trạng thái đơn hàng thành công"), 200
 
+# --- DASHBOARD STATS ---
 @app.route('/api/dashboard/stats', methods=['GET'])
 @manager_required()
 def get_dashboard_stats():
     try:
-        # 1. Tổng doanh thu (Sử dụng DB aggregation cho hiệu năng cao)
-        total_revenue = db.session.query(func.sum(Order.total_amount))\
-            .filter(Order.order_status == 'completed').scalar() or 0
-        
-        # 2. Đếm số lượng đơn hàng theo trạng thái
-        status_stats = db.session.query(Order.order_status, func.count(Order.id))\
-            .group_by(Order.order_status).all()
+        total_revenue = db.session.query(func.sum(Order.total_amount)).filter(Order.order_status == 'completed').scalar() or 0
+        status_stats = db.session.query(Order.order_status, func.count(Order.id)).group_by(Order.order_status).all()
         status_counts = {status: count for status, count in status_stats}
         total_orders = db.session.query(func.count(Order.id)).scalar() or 0
-
-        # 3. Thống kê doanh thu 7 ngày gần nhất
         daily_stats = []
         now = datetime.now(timezone.utc)
         for i in range(6, -1, -1):
             target_date = (now - timedelta(days=i)).date()
-            daily_rev = db.session.query(func.sum(Order.total_amount))\
-                .filter(func.date(Order.created_at) == target_date)\
-                .filter(Order.order_status == 'completed').scalar() or 0
-            daily_stats.append({
-                "date": target_date.strftime("%d/%m"),
-                "revenue": daily_rev
-            })
-
-        return jsonify({
-            "total_revenue": total_revenue,
-            "total_orders": total_orders,
-            "status_counts": status_counts,
-            "daily_stats": daily_stats
-        }), 200
+            daily_rev = db.session.query(func.sum(Order.total_amount)).filter(func.date(Order.created_at) == target_date).filter(Order.order_status == 'completed').scalar() or 0
+            daily_stats.append({"date": target_date.strftime("%d/%m"), "revenue": daily_rev})
+        return jsonify({"total_revenue": total_revenue, "total_orders": total_orders, "status_counts": status_counts, "daily_stats": daily_stats}), 200
     except Exception as e:
         return jsonify(message=str(e)), 500
 
 if __name__ == '__main__':
-    # Render yêu cầu chạy trên host 0.0.0.0 và đúng Port hệ thống cấp
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
