@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Menu.css'; 
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+// --- CẤU HÌNH URL API ---
+// Sử dụng biến môi trường từ .env, mặc định localhost nếu không tìm thấy
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = `${BASE_URL}/api`;
 
 const Menu = () => {
     const [menuData, setMenuData] = useState([]);
@@ -29,7 +32,7 @@ const Menu = () => {
                     'Content-Type': 'application/json'
                 };
 
-                // Lấy đồng thời Danh mục và Sản phẩm
+                // Lấy đồng thời Danh mục và Sản phẩm từ Backend Render
                 const [resCat, resProd] = await Promise.all([
                     fetch(`${API_BASE_URL}/categories`, { headers }),
                     fetch(`${API_BASE_URL}/products`, { headers })
@@ -56,6 +59,7 @@ const Menu = () => {
                 setMenuData(categorizedMenu);
 
             } catch (err) {
+                console.error("Fetch Menu Error:", err);
                 setError(err.message || 'Lỗi kết nối Server.');
             } finally {
                 setLoading(false);
@@ -104,7 +108,6 @@ const Menu = () => {
                 </div>
                 
                 <div className="button-group">
-                    {/* Các nút chỉ dành cho Quản lý */}
                     {userRole === 'manager' && (
                         <>
                             <button className="btn btn-dashboard" onClick={() => navigate('/dashboard')}>📊 Báo Cáo</button>
@@ -113,7 +116,6 @@ const Menu = () => {
                         </>
                     )}
                     
-                    {/* Nút dành cho cả Staff và Manager */}
                     <button className="btn btn-order-list" onClick={() => navigate('/orders')}>📄 Đơn Hàng</button>
                     <button className="btn btn-create-order" onClick={() => navigate('/order')}>🛒 Tạo Đơn Mới</button>
                     <button className="btn btn-logout" onClick={handleLogout}>Đăng Xuất</button>

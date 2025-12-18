@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './GuestOrderKiosk.css'; 
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+// --- CẤU HÌNH URL API ---
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = `${BASE_URL}/api`;
 
 const GuestOrderKiosk = () => {
     const [menuData, setMenuData] = useState([]);
@@ -20,10 +22,12 @@ const GuestOrderKiosk = () => {
     const fetchMenuData = async () => {
         setLoading(true);
         try {
+            // Khách vãng lai gọi API không cần Token
             const [categoriesResponse, productsResponse] = await Promise.all([
                 fetch(`${API_BASE_URL}/categories`),
                 fetch(`${API_BASE_URL}/products`)
             ]);
+            
             const categoriesData = await categoriesResponse.json();
             const productsData = await productsResponse.json();
             
@@ -33,7 +37,8 @@ const GuestOrderKiosk = () => {
             }));
             setMenuData(categorizedMenu);
         } catch (err) {
-            setError('Không thể kết nối máy chủ.');
+            console.error("Kiosk Fetch Error:", err);
+            setError('Không thể kết nối máy chủ. Vui lòng báo nhân viên.');
         } finally {
             setLoading(false);
         }
@@ -67,6 +72,7 @@ const GuestOrderKiosk = () => {
 
     const handlePlaceOrder = async () => {
         if (cart.length === 0) return;
+        
         const itemsPayload = cart.map(item => ({
             product_id: item.product_id,
             quantity: item.quantity,
@@ -86,9 +92,10 @@ const GuestOrderKiosk = () => {
                 setMessage(`🎉 THÀNH CÔNG! Mã đơn: #${data.order.id}. Vui lòng chờ gọi món.`);
                 setCart([]);
                 setIsError(false);
+                // Tự động ẩn thông báo sau 10 giây
                 setTimeout(() => setMessage(''), 10000);
             } else {
-                setMessage(`Lỗi: ${data.message}`);
+                setMessage(`Lỗi: ${data.message || 'Không thể tạo đơn hàng'}`);
                 setIsError(true);
             }
         } catch (err) {
@@ -98,6 +105,7 @@ const GuestOrderKiosk = () => {
     };
 
     if (loading) return <div className="kiosk-page-wrapper">☕ Đang tải menu...</div>;
+    if (error) return <div className="kiosk-page-wrapper">❌ {error}</div>;
 
     return (
         <div className="kiosk-page-wrapper">
@@ -120,7 +128,6 @@ const GuestOrderKiosk = () => {
                                 <div className="product-grid">
                                     {category.products.map(product => (
                                         <div key={product.id} className="product-card">
-                                            {/* PHẦN HIỂN THỊ HÌNH ẢNH MỚI */}
                                             <div className="product-image-box">
                                                 <img 
                                                     src={product.image_url || 'https://via.placeholder.com/200x150?text=No+Image'} 
@@ -148,7 +155,7 @@ const GuestOrderKiosk = () => {
                         <h2 style={{textAlign: 'center', margin: '0 0 20px 0'}}>🛒 Đơn hàng</h2>
                         
                         {message && (
-                            <div className={`alert`} style={{ 
+                            <div style={{ 
                                 padding: '15px', borderRadius: '8px', marginBottom: '15px', 
                                 background: isError ? '#f8d7da' : '#d4edda', 
                                 color: isError ? '#721c24' : '#155724', fontWeight: 'bold' 

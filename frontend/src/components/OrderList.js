@@ -1,9 +1,10 @@
-// src/components/OrderList.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './OrderList.css'; 
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+// --- CẤU HÌNH URL API ---
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = `${BASE_URL}/api`;
 
 const OrderList = () => {
     const [orders, setOrders] = useState([]);
@@ -13,17 +14,30 @@ const OrderList = () => {
     
     const token = localStorage.getItem('access_token');
 
-    const fetchOrders = async () => {
-        if (!token) { navigate('/'); return; }
+    // Sử dụng useCallback để hàm fetchOrders không bị khởi tạo lại liên tục
+    const fetchOrders = useCallback(async () => {
+        if (!token) { 
+            navigate('/'); 
+            return; 
+        }
         try {
             const response = await fetch(`${API_BASE_URL}/orders`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+
+            if (response.status === 401) {
+                localStorage.clear();
+                navigate('/');
+                return;
+            }
+
             if (response.status === 403) {
                 setError('Bạn không có quyền xem danh sách này.');
                 return;
             }
+
             if (!response.ok) throw new Error('Lỗi tải danh sách đơn hàng.');
+
             const data = await response.json();
             setOrders(data);
         } catch (err) {
@@ -31,13 +45,14 @@ const OrderList = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [token, navigate]);
 
     useEffect(() => {
         fetchOrders();
+        // Tự động cập nhật đơn hàng mới mỗi 30 giây
         const interval = setInterval(fetchOrders, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchOrders]);
 
     const handleUpdateStatus = async (orderId, newStatus) => {
         try {
@@ -49,9 +64,15 @@ const OrderList = () => {
                 },
                 body: JSON.stringify({ order_status: newStatus })
             });
-            if (response.ok) fetchOrders();
+
+            if (response.ok) {
+                fetchOrders(); // Tải lại danh sách sau khi cập nhật thành công
+            } else {
+                const data = await response.json();
+                alert(`Lỗi: ${data.message || 'Không thể cập nhật trạng thái'}`);
+            }
         } catch (err) {
-            alert('Lỗi kết nối.');
+            alert('Lỗi kết nối Server.');
         }
     };
 
@@ -63,11 +84,11 @@ const OrderList = () => {
         }
     };
 
-    if (loading) return <div className="order-list-wrapper">Đang tải dữ liệu...</div>;
+    if (loading) return <div className="order-list-wrapper">Đang tải dữ liệu đơn hàng...</div>;
+    if (error) return <div className="order-list-wrapper" style={{color: 'red'}}>{error}</div>;
 
     return (
         <div className="order-list-wrapper">
-            {/* Header đã bỏ Inline Style để dùng CSS file */}
             <header className="order-list-header">
                 <div className="header-title">
                     <h1>📋 Quản Lý Đơn Hàng</h1>

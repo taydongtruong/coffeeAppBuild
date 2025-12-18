@@ -7,18 +7,33 @@ import OrderCreation from './components/OrderCreation';
 import OrderList from './components/OrderList';
 import MenuManagement from './components/MenuManagement'; 
 import UserManagement from './components/UserManagement'; 
-import Dashboard from './components/Dashboard'; // Trang báo cáo doanh thu mới
+import Dashboard from './components/Dashboard'; 
 import GuestOrderKiosk from './components/GuestOrderKiosk';
 import './index.css'; 
 
-// 1. Kiểm tra đăng nhập cơ bản (dành cho Staff)
-const isAuthenticated = () => !!localStorage.getItem('access_token');
+// --- HELPER FUNCTIONS ---
 
-// 2. Kiểm tra quyền Quản lý (dành cho Manager)
+// Kiểm tra xem đã đăng nhập chưa
+const isAuthenticated = () => {
+  return !!localStorage.getItem('access_token');
+};
+
+// Kiểm tra xem có phải quản lý không
 const isManager = () => {
   const token = localStorage.getItem('access_token');
   const role = localStorage.getItem('user_role');
   return token && role === 'manager';
+};
+
+// --- PROTECTED ROUTE COMPONENTS ---
+// Bảo vệ các trang chỉ dành cho nhân viên/quản lý đã đăng nhập
+const ProtectedRoute = ({ children }) => {
+  return isAuthenticated() ? children : <Navigate to="/" />;
+};
+
+// Bảo vệ các trang CHỈ dành cho quản lý
+const ManagerRoute = ({ children }) => {
+  return isManager() ? children : <Navigate to="/menu" />;
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -34,29 +49,29 @@ root.render(
         {/* ================= DÀNH CHO NHÂN VIÊN (STAFF & MANAGER) ================= */}
         <Route 
           path="/menu" 
-          element={isAuthenticated() ? <Menu /> : <Navigate to="/" />} 
+          element={<ProtectedRoute><Menu /></ProtectedRoute>} 
         />
         <Route 
           path="/order" 
-          element={isAuthenticated() ? <OrderCreation /> : <Navigate to="/" />} 
+          element={<ProtectedRoute><OrderCreation /></ProtectedRoute>} 
         /> 
         <Route 
           path="/orders" 
-          element={isAuthenticated() ? <OrderList /> : <Navigate to="/" />} 
+          element={<ProtectedRoute><OrderList /></ProtectedRoute>} 
         />
 
         {/* ================= CHỈ DÀNH CHO QUẢN LÝ (MANAGER ONLY) ================= */}
         <Route 
           path="/manage" 
-          element={isManager() ? <MenuManagement /> : <Navigate to="/menu" />} 
+          element={<ManagerRoute><MenuManagement /></ManagerRoute>} 
         /> 
         <Route 
           path="/users" 
-          element={isManager() ? <UserManagement /> : <Navigate to="/menu" />} 
+          element={<ManagerRoute><UserManagement /></ManagerRoute>} 
         /> 
         <Route 
           path="/dashboard" 
-          element={isManager() ? <Dashboard /> : <Navigate to="/menu" />} 
+          element={<ManagerRoute><Dashboard /></ManagerRoute>} 
         />
 
         {/* ================= XỬ LÝ ĐƯỜNG DẪN SAI ================= */}

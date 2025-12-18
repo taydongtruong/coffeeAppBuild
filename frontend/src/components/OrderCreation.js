@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './OrderCreation.css'; 
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+// --- CẤU HÌNH URL API ---
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = `${BASE_URL}/api`;
 
 const OrderCreation = () => {
     const [products, setProducts] = useState([]);
@@ -12,17 +14,32 @@ const OrderCreation = () => {
     const token = localStorage.getItem('access_token');
 
     useEffect(() => {
-        if (!token) { navigate('/'); return; }
+        if (!token) { 
+            navigate('/'); 
+            return; 
+        }
         fetchProducts();
-    }, [token]);
+    }, [token, navigate]);
 
     const fetchProducts = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/products`);
+            // CẦN THÊM AUTHORIZATION ĐỂ LẤY PRODUCTS
+            const res = await fetch(`${API_BASE_URL}/products`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (res.status === 401) {
+                localStorage.clear();
+                navigate('/');
+                return;
+            }
+
             const data = await res.json();
             setProducts(data);
         } catch (err) { 
-            console.error("Lỗi tải sản phẩm"); 
+            console.error("Lỗi tải sản phẩm:", err); 
         } finally { 
             setLoading(false); 
         }
@@ -90,13 +107,12 @@ const OrderCreation = () => {
             </header>
 
             <div className="order-content-layout">
-                {/* BÊN TRÁI: DANH SÁCH MÓN CÓ ẢNH */}
+                {/* BÊN TRÁI: DANH SÁCH MÓN */}
                 <div className="category-section">
                     <h3 className="category-title">Thực đơn tại quầy</h3>
                     <div className="product-grid">
                         {products.map(p => (
                             <div key={p.id} className="product-item" onClick={() => addToCart(p)}>
-                                {/* THÊM HÌNH ẢNH MINH HỌA */}
                                 <div className="product-thumb-pos">
                                     <img 
                                         src={p.image_url || 'https://via.placeholder.com/100?text=Cafe'} 

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './UserManagement.css'; // Sử dụng file CSS mới
+import './UserManagement.css'; 
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+// --- CẤU HÌNH URL API ---
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = `${BASE_URL}/api`;
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
@@ -19,6 +21,7 @@ const UserManagement = () => {
     });
 
     useEffect(() => {
+        // Bảo vệ route: Chỉ Manager có Token mới được vào
         if (!token || userRole !== 'manager') {
             navigate('/');
             return;
@@ -35,10 +38,11 @@ const UserManagement = () => {
                 const data = await response.json();
                 setUsers(data);
             } else if (response.status === 401) {
+                localStorage.clear();
                 navigate('/');
             }
         } catch (err) {
-            console.error("Lỗi kết nối:", err);
+            console.error("Lỗi kết nối Server:", err);
         } finally {
             setLoading(false);
         }
@@ -46,7 +50,7 @@ const UserManagement = () => {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
-        setMessage('');
+        setMessage('Đang xử lý...');
         setIsError(false);
 
         try {
@@ -93,13 +97,15 @@ const UserManagement = () => {
                 setMessage("Xóa nhân viên thành công.");
                 setIsError(false);
                 fetchUsers();
+            } else {
+                alert("Không thể xóa tài khoản này.");
             }
         } catch (err) { 
             alert("Lỗi kết nối server"); 
         }
     };
 
-    if (loading) return <div className="user-container">Đang tải dữ liệu nhân sự...</div>;
+    if (loading) return <div className="user-container">🚀 Đang tải dữ liệu nhân sự...</div>;
 
     return (
         <div className="user-container">
@@ -108,7 +114,7 @@ const UserManagement = () => {
                     <h1 style={{ margin: 0 }}>👥 Quản Lý Nhân Sự</h1>
                     <p style={{ color: '#718096', margin: 0 }}>Quản lý quyền truy cập hệ thống</p>
                 </div>
-                <button className="btn-delete-user" style={{ color: '#4a5568' }} onClick={() => navigate('/menu')}>
+                <button className="btn-delete-user" style={{ color: '#4a5568', cursor: 'pointer' }} onClick={() => navigate('/menu')}>
                     ← Quay lại
                 </button>
             </header>
@@ -164,7 +170,7 @@ const UserManagement = () => {
                                 <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{u.full_name}</div>
                                 <div style={{ color: '#718096', fontSize: '0.9rem' }}>@{u.username}</div>
                                 <span className={`role-badge role-${u.role}`}>
-                                    {u.role}
+                                    {u.role === 'manager' ? 'Quản lý' : 'Nhân viên'}
                                 </span>
                             </div>
                             <div className="actions">
@@ -173,7 +179,7 @@ const UserManagement = () => {
                                         Xóa
                                     </button>
                                 ) : (
-                                    <small style={{ color: '#a0aec0' }}>System Admin</small>
+                                    <small style={{ color: '#a0aec0' }}>Hệ thống</small>
                                 )}
                             </div>
                         </div>
