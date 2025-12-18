@@ -6,14 +6,22 @@ from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt, verify_jwt_in_request
 from functools import wraps
+from sqlalchemy import func
 
 app = Flask(__name__)
 
 # --- CẤU HÌNH HỆ THỐNG ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafe_manager.db'
+# Hỗ trợ cả SQLite (Local) và PostgreSQL (Render)
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///cafe_manager.db')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'secure_key_123'
-app.config['JWT_SECRET_KEY'] = 'jwt_secret_456'
+
+# Bảo mật Key bằng biến môi trường
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secure_key_123')
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'default_jwt_secret_456')
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
 
 db = SQLAlchemy(app)
@@ -135,16 +143,6 @@ def manage_users():
     users = User.query.all()
     return jsonify([u.to_dict() for u in users]), 200
 
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
-@manager_required()
-def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.username == 'admin_cafe':
-        return jsonify(message="Không thể xóa admin gốc"), 400
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify(message="Xóa thành công"), 200
-
 @app.route('/api/orders', methods=['GET', 'POST'])
 def manage_orders():
     if request.method == 'POST':
@@ -188,15 +186,6 @@ def manage_orders():
         })
     return jsonify(result), 200
 
-@app.route('/api/orders/<int:order_id>', methods=['PUT'])
-@manager_required()
-def update_order_status(order_id):
-    order = Order.query.get_or_404(order_id)
-    data = request.get_json()
-    order.order_status = data.get('order_status', order.order_status)
-    db.session.commit()
-    return jsonify(message="Cập nhật trạng thái thành công"), 200
-
 @app.route('/api/products', methods=['GET', 'POST'])
 def manage_products():
     if request.method == 'POST':
@@ -213,83 +202,43 @@ def manage_products():
         return jsonify(product=new_prod.to_dict()), 201
     return jsonify([p.to_dict() for p in Product.query.all()]), 200
 
-@app.route('/api/products/<int:id>', methods=['DELETE', 'PUT'])
-@manager_required()
-def handle_single_product(id):
-    product = Product.query.get_or_404(id)
-    if request.method == 'DELETE':
-        db.session.delete(product)
-        db.session.commit()
-        return jsonify(message="Xóa thành công"), 200
-    if request.method == 'PUT':
-        data = request.get_json()
-        product.name = data.get('name', product.name)
-        product.price = data.get('price', product.price)
-        product.image_url = data.get('image_url', product.image_url)
-        db.session.commit()
-        return jsonify(message="Cập nhật thành công"), 200
-
-@app.route('/api/categories', methods=['GET', 'POST'])
-def manage_categories():
-    if request.method == 'POST':
-        verify_jwt_in_request()
-        data = request.get_json()
-        new_cat = Category(name=data['name'])
-        db.session.add(new_cat)
-        db.session.commit()
-        return jsonify(category=new_cat.to_dict()), 201
-    return jsonify([c.to_dict() for c in Category.query.all()]), 200
-
-@app.route('/api/categories/<int:id>', methods=['DELETE'])
-@manager_required()
-def delete_category(id):
-    category = Category.query.get_or_404(id)
-    db.session.delete(category)
-    db.session.commit()
-    return jsonify(message="Xóa thành công"), 200
-
-# --- ROUTE MỚI: DASHBOARD STATS ---
 @app.route('/api/dashboard/stats', methods=['GET'])
 @manager_required()
 def get_dashboard_stats():
     try:
-        all_orders = Order.query.all()
+        # 1. Tổng doanh thu (Sử dụng DB aggregation cho hiệu năng cao)
+        total_revenue = db.session.query(func.sum(Order.total_amount))\
+            .filter(Order.order_status == 'completed').scalar() or 0
         
-        # 1. Tính toán tổng doanh thu (chỉ tính đơn hàng đã hoàn thành)
-        total_revenue = sum(o.total_amount for o in all_orders if o.order_status == 'completed')
-        
-        # 2. Đếm số lượng theo trạng thái
-        total_orders = len(all_orders)
-        completed_count = len([o for o in all_orders if o.order_status == 'completed'])
-        pending_count = len([o for o in all_orders if o.order_status == 'pending'])
-        cancelled_count = len([o for o in all_orders if o.order_status == 'cancelled'])
+        # 2. Đếm số lượng đơn hàng theo trạng thái
+        status_stats = db.session.query(Order.order_status, func.count(Order.id))\
+            .group_by(Order.order_status).all()
+        status_counts = {status: count for status, count in status_stats}
+        total_orders = db.session.query(func.count(Order.id)).scalar() or 0
 
         # 3. Thống kê doanh thu 7 ngày gần nhất
         daily_stats = []
         now = datetime.now(timezone.utc)
         for i in range(6, -1, -1):
             target_date = (now - timedelta(days=i)).date()
-            daily_revenue = sum(o.total_amount for o in all_orders 
-                               if o.created_at.date() == target_date and o.order_status == 'completed')
+            daily_rev = db.session.query(func.sum(Order.total_amount))\
+                .filter(func.date(Order.created_at) == target_date)\
+                .filter(Order.order_status == 'completed').scalar() or 0
             daily_stats.append({
                 "date": target_date.strftime("%d/%m"),
-                "revenue": daily_revenue
+                "revenue": daily_rev
             })
 
         return jsonify({
             "total_revenue": total_revenue,
             "total_orders": total_orders,
-            "status_counts": {
-                "completed": completed_count,
-                "pending": pending_count,
-                "cancelled": cancelled_count
-            },
+            "status_counts": status_counts,
             "daily_stats": daily_stats
         }), 200
     except Exception as e:
         return jsonify(message=str(e)), 500
 
 if __name__ == '__main__':
-    import os
+    # Render yêu cầu chạy trên host 0.0.0.0 và đúng Port hệ thống cấp
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
