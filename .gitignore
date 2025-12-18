@@ -1,15 +1,7 @@
-# Python / Flask
 __pycache__/
 *.pyc
 .env
-venv/
-
-# Database
+instance/
 *.db
-
-# Node / React
-node_modules/
-build/
-dist/
-npm-debug.log
-.DS_Store
+virenv/
+.venv/
