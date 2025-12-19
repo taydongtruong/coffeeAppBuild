@@ -33,11 +33,11 @@ const Login = () => {
         localStorage.setItem('user_role', data.user.role);
         localStorage.setItem('full_name', data.user.full_name);
         
-        setMessage('Đăng nhập thành công!');
+        setMessage('Bẻ khoá nhà Thành công');
         // Chuyển hướng sau 1 giây
         setTimeout(() => navigate('/menu'), 1000);
       } else {
-        setMessage(data.message || 'Tài khoản hoặc mật khẩu không đúng.');
+        setMessage(data.message || 'Sai mật khẩu và tài khoản rồi bạn ơi!');
       }
     } catch (error) {
       console.error("Login Error:", error);
@@ -48,7 +48,7 @@ const Login = () => {
   return (
     <div className="login-wrapper">
       <div className="login-card">
-        <h2>🔑 Quản Lý Cafe</h2>
+        <h2>🔑 Chào mừng bạn đến với cà phê Reak Smaay </h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Tên đăng nhập</label>
