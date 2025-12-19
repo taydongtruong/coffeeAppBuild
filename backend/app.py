@@ -51,8 +51,11 @@ class Category(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     products = db.relationship('Product', backref='category', lazy=True, cascade="all, delete-orphan")
 
-    def to_dict(self):
-        return {'id': self.id, 'name': self.name}
+    def to_dict(self, include_products=False):
+        data = {'id': self.id, 'name': self.name}
+        if include_products:
+            data['products'] = [p.to_dict() for p in self.products if p.is_available]
+        return data
 
 class Product(db.Model):
     __tablename__ = 'products'
@@ -87,6 +90,7 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
+    notes = db.Column(db.String(255), nullable=True) # FIXED: Added notes column
     product = db.relationship('Product', backref='order_items_ref', lazy=True)
 
 # --- MIDDLEWARE ---
@@ -115,7 +119,7 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    return jsonify(message="Cafe API is Online", version="1.0"), 200
+    return jsonify(message="Cafe API is Online", version="1.1"), 200
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -126,7 +130,6 @@ def login():
         return jsonify(user=user.to_dict(), access_token=access_token), 200
     return jsonify({"message": "Tài khoản hoặc mật khẩu không chính xác"}), 401
 
-# --- ROUTES CHO CATEGORY (ĐÃ THÊM MỚI) ---
 @app.route('/api/categories', methods=['GET', 'POST'])
 def manage_categories():
     if request.method == 'POST':
@@ -136,7 +139,9 @@ def manage_categories():
         db.session.add(new_cat)
         db.session.commit()
         return jsonify(category=new_cat.to_dict()), 201
-    return jsonify([c.to_dict() for c in Category.query.all()]), 200
+    
+    include_products = request.args.get('include_products') == 'true'
+    return jsonify([c.to_dict(include_products=include_products) for c in Category.query.all()]), 200
 
 @app.route('/api/categories/<int:id>', methods=['DELETE'])
 @manager_required()
@@ -146,7 +151,6 @@ def delete_category(id):
     db.session.commit()
     return jsonify(message="Xóa danh mục thành công"), 200
 
-# --- ROUTES CHO PRODUCT ---
 @app.route('/api/products', methods=['GET', 'POST'])
 def manage_products():
     if request.method == 'POST':
@@ -173,10 +177,11 @@ def update_delete_product(id):
     product.name = data.get('name', product.name)
     product.price = data.get('price', product.price)
     product.is_available = data.get('is_available', product.is_available)
+    product.category_id = data.get('category_id', product.category_id)
+    product.image_url = data.get('image_url', product.image_url)
     db.session.commit()
     return jsonify(product=product.to_dict()), 200
 
-# --- ROUTES CHO ORDER ---
 @app.route('/api/orders', methods=['GET', 'POST'])
 def manage_orders():
     if request.method == 'POST':
@@ -193,10 +198,12 @@ def manage_orders():
         for i in items_data:
             db.session.add(OrderItem(
                 order_id=new_order.id, product_id=i['product_id'],
-                quantity=i['quantity'], unit_price=i['unit_price']
+                quantity=i['quantity'], unit_price=i['unit_price'],
+                notes=i.get('notes') # FIXED: Save notes from Kiosk
             ))
         db.session.commit()
         return jsonify(order={'id': new_order.id}), 201
+    
     orders = Order.query.order_by(Order.created_at.desc()).all()
     result = []
     for o in orders:
@@ -204,7 +211,7 @@ def manage_orders():
             'id': o.id, 'total_amount': o.total_amount, 'order_status': o.order_status,
             'created_at': o.created_at.isoformat(),
             'created_by': o.creator.full_name if o.creator else "Khách vãng lai",
-            'items': [{'product_name': i.product.name, 'quantity': i.quantity, 'unit_price': i.unit_price} for i in o.items]
+            'items': [{'product_name': i.product.name, 'quantity': i.quantity, 'unit_price': i.unit_price, 'notes': i.notes} for i in o.items]
         })
     return jsonify(result), 200
 
@@ -217,29 +224,18 @@ def update_order_status(id):
     db.session.commit()
     return jsonify(message="Cập nhật trạng thái đơn hàng thành công"), 200
 
-# --- ROUTES CHO USER MANAGEMENT (BỔ SUNG) ---
-
 @app.route('/api/users', methods=['GET', 'POST'])
 @manager_required()
 def manage_users():
     if request.method == 'POST':
         data = request.get_json()
-        
-        # Kiểm tra username đã tồn tại chưa
         if User.query.filter_by(username=data.get('username')).first():
             return jsonify(message="Tên đăng nhập đã tồn tại"), 400
-            
-        new_user = User(
-            username=data.get('username'),
-            full_name=data.get('full_name'),
-            role=data.get('role', 'staff')
-        )
+        new_user = User(username=data.get('username'), full_name=data.get('full_name'), role=data.get('role', 'staff'))
         new_user.set_password(data.get('password'))
         db.session.add(new_user)
         db.session.commit()
         return jsonify(user=new_user.to_dict()), 201
-
-    # Lấy danh sách tất cả user
     users = User.query.all()
     return jsonify([u.to_dict() for u in users]), 200
 
@@ -247,16 +243,12 @@ def manage_users():
 @manager_required()
 def delete_user(id):
     user = User.query.get_or_404(id)
-    
-    # Không cho phép xóa admin hệ thống
     if user.username == 'admin_cafe':
         return jsonify(message="Không thể xóa tài khoản quản trị hệ thống"), 403
-        
     db.session.delete(user)
     db.session.commit()
     return jsonify(message="Xóa người dùng thành công"), 200
 
-# --- DASHBOARD STATS ---
 @app.route('/api/dashboard/stats', methods=['GET'])
 @manager_required()
 def get_dashboard_stats():
