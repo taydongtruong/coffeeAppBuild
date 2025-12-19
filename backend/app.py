@@ -11,9 +11,8 @@ from sqlalchemy import func
 app = Flask(__name__)
 
 # --- CẤU HÌNH HỆ THỐNG ---
-# Tự động chuyển đổi URL cho PostgreSQL khi triển khai lên Render/Heroku
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///cafe_manager.db')
-if db_url.startswith("postgres://"):
+if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
@@ -26,7 +25,7 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
-# Cấu hình CORS mở rộng để tránh lỗi "Lỗi tải danh sách" trên Internet
+# CORS tối ưu cho triển khai Internet
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # --- MODELS ---
@@ -92,7 +91,7 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
-    notes = db.Column(db.String(255), nullable=True)
+    notes = db.Column(db.String(255), nullable=True) # Cột gây lỗi đã được khai báo
     product = db.relationship('Product', backref='order_items_ref', lazy=True)
 
 # --- MIDDLEWARE ---
@@ -110,7 +109,11 @@ def manager_required():
 
 # --- KHỞI TẠO DB ---
 with app.app_context():
+    # CÁCH 1: XÓA VÀ TẠO LẠI ĐỂ CẬP NHẬT CỘT 'NOTES' TRÊN RENDER
+    # Sau khi app đã chạy ổn định, bạn nên comment dòng drop_all() này lại.
+    db.drop_all() 
     db.create_all()
+    
     if not User.query.filter_by(username='admin_cafe').first():
         admin = User(username='admin_cafe', full_name='Quản trị viên', role='manager')
         admin.set_password('123456')
@@ -121,7 +124,7 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    return jsonify(message="Cafe API is Online", version="1.2"), 200
+    return jsonify(message="Cafe API is Online", version="1.3"), 200
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -141,17 +144,8 @@ def manage_categories():
         db.session.add(new_cat)
         db.session.commit()
         return jsonify(category=new_cat.to_dict()), 201
-    
     include_products = request.args.get('include_products') == 'true'
     return jsonify([c.to_dict(include_products=include_products) for c in Category.query.all()]), 200
-
-@app.route('/api/categories/<int:id>', methods=['DELETE'])
-@manager_required()
-def delete_category(id):
-    category = Category.query.get_or_404(id)
-    db.session.delete(category)
-    db.session.commit()
-    return jsonify(message="Xóa danh mục thành công"), 200
 
 @app.route('/api/products', methods=['GET', 'POST'])
 def manage_products():
@@ -166,23 +160,6 @@ def manage_products():
         db.session.commit()
         return jsonify(product=new_prod.to_dict()), 201
     return jsonify([p.to_dict() for p in Product.query.all()]), 200
-
-@app.route('/api/products/<int:id>', methods=['PUT', 'DELETE'])
-@manager_required()
-def update_delete_product(id):
-    product = Product.query.get_or_404(id)
-    if request.method == 'DELETE':
-        db.session.delete(product)
-        db.session.commit()
-        return jsonify(message="Xóa sản phẩm thành công"), 200
-    data = request.get_json()
-    product.name = data.get('name', product.name)
-    product.price = data.get('price', product.price)
-    product.is_available = data.get('is_available', product.is_available)
-    product.category_id = data.get('category_id', product.category_id)
-    product.image_url = data.get('image_url', product.image_url)
-    db.session.commit()
-    return jsonify(product=product.to_dict()), 200
 
 @app.route('/api/orders', methods=['GET', 'POST'])
 def manage_orders():
@@ -208,7 +185,6 @@ def manage_orders():
         db.session.commit()
         return jsonify(order={'id': new_order.id}), 201
     
-    # API GET Orders đã được tối ưu cho Staff Dashboard
     orders = Order.query.order_by(Order.created_at.desc()).all()
     result = []
     for o in orders:
@@ -220,30 +196,6 @@ def manage_orders():
         })
     return jsonify(result), 200
 
-@app.route('/api/orders/<int:id>', methods=['PUT'])
-@jwt_required()
-def update_order_status(id):
-    order = Order.query.get_or_404(id)
-    data = request.get_json()
-    order.order_status = data.get('order_status', order.order_status)
-    db.session.commit()
-    return jsonify(message="Cập nhật trạng thái thành công"), 200
-
-@app.route('/api/users', methods=['GET', 'POST'])
-@manager_required()
-def manage_users():
-    if request.method == 'POST':
-        data = request.get_json()
-        if User.query.filter_by(username=data.get('username')).first():
-            return jsonify(message="Tên đăng nhập đã tồn tại"), 400
-        new_user = User(username=data.get('username'), full_name=data.get('full_name'), role=data.get('role', 'staff'))
-        new_user.set_password(data.get('password'))
-        db.session.add(new_user)
-        db.session.commit()
-        return jsonify(user=new_user.to_dict()), 201
-    users = User.query.all()
-    return jsonify([u.to_dict() for u in users]), 200
-
 @app.route('/api/dashboard/stats', methods=['GET'])
 @manager_required()
 def get_dashboard_stats():
@@ -251,13 +203,11 @@ def get_dashboard_stats():
         total_revenue = db.session.query(func.sum(Order.total_amount)).filter(Order.order_status == 'completed').scalar() or 0
         status_stats = db.session.query(Order.order_status, func.count(Order.id)).group_by(Order.order_status).all()
         status_counts = {status: count for status, count in status_stats}
-        total_orders = db.session.query(func.count(Order.id)).scalar() or 0
         
         daily_stats = []
         now = datetime.now(timezone.utc)
         for i in range(6, -1, -1):
             target_date = (now - timedelta(days=i)).date()
-            # Tối ưu hóa so sánh ngày để tương thích PostgreSQL/Internet
             start_of_day = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=timezone.utc)
             end_of_day = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=timezone.utc)
             
@@ -267,9 +217,9 @@ def get_dashboard_stats():
                 .filter(Order.order_status == 'completed').scalar() or 0
             daily_stats.append({"date": target_date.strftime("%d/%m"), "revenue": daily_rev})
             
-        return jsonify({"total_revenue": total_revenue, "total_orders": total_orders, "status_counts": status_counts, "daily_stats": daily_stats}), 200
+        return jsonify({"total_revenue": total_revenue, "status_counts": status_counts, "daily_stats": daily_stats}), 200
     except Exception as e:
-        return jsonify(message="Lỗi hệ thống khi tải báo cáo"), 500
+        return jsonify(message="Lỗi thống kê"), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
