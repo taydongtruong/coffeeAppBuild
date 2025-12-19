@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // 1. Thêm useCallback
 import { useNavigate } from 'react-router-dom';
 import './UserManagement.css'; 
 
@@ -20,16 +20,8 @@ const UserManagement = () => {
         username: '', password: '', full_name: '', role: 'staff'
     });
 
-    useEffect(() => {
-        // Bảo vệ route: Chỉ Manager có Token mới được vào
-        if (!token || userRole !== 'manager') {
-            navigate('/');
-            return;
-        }
-        fetchUsers();
-    }, [token, navigate, userRole]);
-
-    const fetchUsers = async () => {
+    // 2. Bọc fetchUsers trong useCallback
+    const fetchUsers = useCallback(async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/users`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -46,7 +38,17 @@ const UserManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [token, navigate]); // Hàm chỉ tạo lại khi token hoặc navigate thay đổi
+
+    // 3. Thêm fetchUsers vào mảng dependency
+    useEffect(() => {
+        // Bảo vệ route: Chỉ Manager có Token mới được vào
+        if (!token || userRole !== 'manager') {
+            navigate('/');
+            return;
+        }
+        fetchUsers();
+    }, [token, navigate, userRole, fetchUsers]); // ESLint sẽ hài lòng với danh sách này
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
@@ -68,7 +70,7 @@ const UserManagement = () => {
             if (response.ok) {
                 setMessage(`Thành công: Đã tạo tài khoản ${data.user.username}`);
                 setNewUser({ username: '', password: '', full_name: '', role: 'staff' });
-                fetchUsers();
+                fetchUsers(); // Gọi lại hàm ổn định từ useCallback
             } else {
                 setMessage(`Lỗi: ${data.message || 'Không thể tạo tài khoản'}`);
                 setIsError(true);
@@ -96,7 +98,7 @@ const UserManagement = () => {
             if (res.ok) {
                 setMessage("Xóa nhân viên thành công.");
                 setIsError(false);
-                fetchUsers();
+                fetchUsers(); // Gọi lại hàm ổn định từ useCallback
             } else {
                 alert("Không thể xóa tài khoản này.");
             }
@@ -109,6 +111,7 @@ const UserManagement = () => {
 
     return (
         <div className="user-container">
+            {/* Giữ nguyên phần giao diện (JSX) bên dưới của bạn */}
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                 <div>
                     <h1 style={{ margin: 0 }}>👥 Quản Lý Nhân Sự</h1>
@@ -120,7 +123,6 @@ const UserManagement = () => {
             </header>
 
             <div className="user-mgmt-grid">
-                {/* FORM TẠO MỚI */}
                 <aside className="user-form-card">
                     <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Tạo tài khoản</h3>
                     
@@ -162,7 +164,6 @@ const UserManagement = () => {
                     </form>
                 </aside>
 
-                {/* DANH SÁCH NHÂN VIÊN */}
                 <main className="user-card-list">
                     {users.map(u => (
                         <div key={u.id} className="user-item-card">

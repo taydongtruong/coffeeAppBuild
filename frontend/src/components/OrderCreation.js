@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // 1. Thêm useCallback
 import { useNavigate } from 'react-router-dom';
 import './OrderCreation.css'; 
 
-// --- CẤU HÌNH URL API ---
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
 const API_BASE_URL = `${BASE_URL}/api`;
 
@@ -13,17 +12,11 @@ const OrderCreation = () => {
     const navigate = useNavigate();
     const token = localStorage.getItem('access_token');
 
-    useEffect(() => {
-        if (!token) { 
-            navigate('/'); 
-            return; 
-        }
-        fetchProducts();
-    }, [token, navigate]);
+    // 2. Bọc fetchProducts trong useCallback để giữ nguyên định danh hàm qua các lần render
+    const fetchProducts = useCallback(async () => {
+        if (!token) return; // Bảo vệ nếu không có token
 
-    const fetchProducts = async () => {
         try {
-            // CẦN THÊM AUTHORIZATION ĐỂ LẤY PRODUCTS
             const res = await fetch(`${API_BASE_URL}/products`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -43,7 +36,16 @@ const OrderCreation = () => {
         } finally { 
             setLoading(false); 
         }
-    };
+    }, [token, navigate]); // Hàm này chỉ tạo lại khi token hoặc navigate thay đổi
+
+    // 3. Bây giờ bạn có thể thêm fetchProducts vào dependency array mà không lo bị lặp vô tận
+    useEffect(() => {
+        if (!token) { 
+            navigate('/'); 
+            return; 
+        }
+        fetchProducts();
+    }, [token, navigate, fetchProducts]); // Đã thêm fetchProducts vào đây theo yêu cầu của ESLint
 
     const addToCart = (product) => {
         setCart(prevCart => {
@@ -98,6 +100,7 @@ const OrderCreation = () => {
 
     return (
         <div className="order-creation-wrapper">
+            {/* ... giữ nguyên phần return bên dưới của bạn ... */}
             <header className="menu-header">
                 <div className="header-title">
                     <h1>☕ Tạo Đơn Hàng Mới</h1>
@@ -107,7 +110,6 @@ const OrderCreation = () => {
             </header>
 
             <div className="order-content-layout">
-                {/* BÊN TRÁI: DANH SÁCH MÓN */}
                 <div className="category-section">
                     <h3 className="category-title">Thực đơn tại quầy</h3>
                     <div className="product-grid">
@@ -130,7 +132,6 @@ const OrderCreation = () => {
                     </div>
                 </div>
 
-                {/* BÊN PHẢI: GIỎ HÀNG */}
                 <aside className="cart-sidebar">
                     <h3 className="category-title">🛒 Chi tiết đơn hàng</h3>
                     {cart.length === 0 ? (
