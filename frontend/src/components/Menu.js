@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // 1. Thêm useCallback
 import { useNavigate } from 'react-router-dom';
 import './Menu.css'; 
 
-// --- CẤU HÌNH URL API ---
-// Sử dụng biến môi trường từ .env, mặc định localhost nếu không tìm thấy
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
 const API_BASE_URL = `${BASE_URL}/api`;
 
@@ -17,8 +15,14 @@ const Menu = () => {
     const token = localStorage.getItem('access_token');
     const userRole = localStorage.getItem('user_role'); 
 
+    // 2. Sử dụng useCallback cho handleLogout vì nó được gọi trong useEffect
+    const handleLogout = useCallback(() => {
+        localStorage.clear();
+        navigate('/');
+    }, [navigate]);
+
+    // 3. useEffect giờ đây đã an toàn để bao gồm handleLogout vào dependency
     useEffect(() => {
-        // Kiểm tra quyền truy cập cơ bản
         if (!token) {
             navigate('/');
             return;
@@ -32,15 +36,13 @@ const Menu = () => {
                     'Content-Type': 'application/json'
                 };
 
-                // Lấy đồng thời Danh mục và Sản phẩm từ Backend Render
                 const [resCat, resProd] = await Promise.all([
                     fetch(`${API_BASE_URL}/categories`, { headers }),
                     fetch(`${API_BASE_URL}/products`, { headers })
                 ]);
 
-                // Kiểm tra nếu Token hết hạn (401)
                 if (resCat.status === 401 || resProd.status === 401) {
-                    handleLogout();
+                    handleLogout(); // Gọi hàm đã được ổn định hóa
                     alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
                     return;
                 }
@@ -50,7 +52,6 @@ const Menu = () => {
                 const categories = await resCat.json();
                 const products = await resProd.json();
                 
-                // Gom nhóm sản phẩm vào từng danh mục tương ứng
                 const categorizedMenu = categories.map(cat => ({
                     ...cat,
                     products: products.filter(p => p.category_id === cat.id)
@@ -67,14 +68,8 @@ const Menu = () => {
         };
 
         fetchMenu();
-    }, [token, navigate]);
+    }, [token, navigate, handleLogout]); // 4. Thêm handleLogout vào đây theo yêu cầu ESLint
 
-    const handleLogout = () => {
-        localStorage.clear();
-        navigate('/');
-    };
-
-    // Logic tìm kiếm món ăn
     const filteredMenu = menuData.map(cat => ({
         ...cat,
         products: cat.products.filter(p => 
@@ -99,6 +94,7 @@ const Menu = () => {
 
     return (
         <div className="menu-container">
+            {/* ... Giữ nguyên phần JSX bên dưới của bạn ... */}
             <header className="menu-header">
                 <div className="header-title">
                     <h1>📋 Quản Lý Menu Cafe</h1>

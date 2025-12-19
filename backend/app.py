@@ -217,6 +217,45 @@ def update_order_status(id):
     db.session.commit()
     return jsonify(message="Cập nhật trạng thái đơn hàng thành công"), 200
 
+# --- ROUTES CHO USER MANAGEMENT (BỔ SUNG) ---
+
+@app.route('/api/users', methods=['GET', 'POST'])
+@manager_required()
+def manage_users():
+    if request.method == 'POST':
+        data = request.get_json()
+        
+        # Kiểm tra username đã tồn tại chưa
+        if User.query.filter_by(username=data.get('username')).first():
+            return jsonify(message="Tên đăng nhập đã tồn tại"), 400
+            
+        new_user = User(
+            username=data.get('username'),
+            full_name=data.get('full_name'),
+            role=data.get('role', 'staff')
+        )
+        new_user.set_password(data.get('password'))
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify(user=new_user.to_dict()), 201
+
+    # Lấy danh sách tất cả user
+    users = User.query.all()
+    return jsonify([u.to_dict() for u in users]), 200
+
+@app.route('/api/users/<int:id>', methods=['DELETE'])
+@manager_required()
+def delete_user(id):
+    user = User.query.get_or_404(id)
+    
+    # Không cho phép xóa admin hệ thống
+    if user.username == 'admin_cafe':
+        return jsonify(message="Không thể xóa tài khoản quản trị hệ thống"), 403
+        
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify(message="Xóa người dùng thành công"), 200
+
 # --- DASHBOARD STATS ---
 @app.route('/api/dashboard/stats', methods=['GET'])
 @manager_required()
