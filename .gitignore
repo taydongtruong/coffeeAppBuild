@@ -1,7 +1,40 @@
+# --- BACKEND (Python/Flask) ---
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .env
+.venv
+env/
+venv/
+ENV/
 instance/
-*.db
-virenv/
-.venv/
+.pytest_cache/
+# File database cục bộ (Rất quan trọng để không bị lộ dữ liệu hoặc ghi đè trên Render)
+backend/cafe.db
+
+# --- FRONTEND (React) ---
+node_modules/
+/frontend/build
+.pnp
+.pnp.js
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+/frontend/coverage
+
+# Environment Variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE Configs
+.vscode/
+.idea/
+*.swp
+*.swo
