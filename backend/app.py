@@ -11,6 +11,7 @@ from sqlalchemy import func
 app = Flask(__name__)
 
 # --- CẤU HÌNH HỆ THỐNG ---
+# Tự động chuyển đổi URL cho PostgreSQL khi triển khai lên Render/Heroku
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///cafe_manager.db')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -25,7 +26,8 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
-CORS(app)
+# Cấu hình CORS mở rộng để tránh lỗi "Lỗi tải danh sách" trên Internet
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # --- MODELS ---
 class User(db.Model):
@@ -90,7 +92,7 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
-    notes = db.Column(db.String(255), nullable=True) # FIXED: Added notes column
+    notes = db.Column(db.String(255), nullable=True)
     product = db.relationship('Product', backref='order_items_ref', lazy=True)
 
 # --- MIDDLEWARE ---
@@ -119,7 +121,7 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    return jsonify(message="Cafe API is Online", version="1.1"), 200
+    return jsonify(message="Cafe API is Online", version="1.2"), 200
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -191,19 +193,22 @@ def manage_orders():
         items_data = data.get('items', [])
         if not items_data:
             return jsonify(message="Giỏ hàng trống"), 400
+        
         total = sum(item.get('unit_price', 0) * item.get('quantity', 0) for item in items_data)
         new_order = Order(user_id=u_id, total_amount=total)
         db.session.add(new_order)
         db.session.flush()
+        
         for i in items_data:
             db.session.add(OrderItem(
                 order_id=new_order.id, product_id=i['product_id'],
                 quantity=i['quantity'], unit_price=i['unit_price'],
-                notes=i.get('notes') # FIXED: Save notes from Kiosk
+                notes=i.get('notes')
             ))
         db.session.commit()
         return jsonify(order={'id': new_order.id}), 201
     
+    # API GET Orders đã được tối ưu cho Staff Dashboard
     orders = Order.query.order_by(Order.created_at.desc()).all()
     result = []
     for o in orders:
@@ -216,13 +221,13 @@ def manage_orders():
     return jsonify(result), 200
 
 @app.route('/api/orders/<int:id>', methods=['PUT'])
-@manager_required()
+@jwt_required()
 def update_order_status(id):
     order = Order.query.get_or_404(id)
     data = request.get_json()
     order.order_status = data.get('order_status', order.order_status)
     db.session.commit()
-    return jsonify(message="Cập nhật trạng thái đơn hàng thành công"), 200
+    return jsonify(message="Cập nhật trạng thái thành công"), 200
 
 @app.route('/api/users', methods=['GET', 'POST'])
 @manager_required()
@@ -239,16 +244,6 @@ def manage_users():
     users = User.query.all()
     return jsonify([u.to_dict() for u in users]), 200
 
-@app.route('/api/users/<int:id>', methods=['DELETE'])
-@manager_required()
-def delete_user(id):
-    user = User.query.get_or_404(id)
-    if user.username == 'admin_cafe':
-        return jsonify(message="Không thể xóa tài khoản quản trị hệ thống"), 403
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify(message="Xóa người dùng thành công"), 200
-
 @app.route('/api/dashboard/stats', methods=['GET'])
 @manager_required()
 def get_dashboard_stats():
@@ -257,15 +252,24 @@ def get_dashboard_stats():
         status_stats = db.session.query(Order.order_status, func.count(Order.id)).group_by(Order.order_status).all()
         status_counts = {status: count for status, count in status_stats}
         total_orders = db.session.query(func.count(Order.id)).scalar() or 0
+        
         daily_stats = []
         now = datetime.now(timezone.utc)
         for i in range(6, -1, -1):
             target_date = (now - timedelta(days=i)).date()
-            daily_rev = db.session.query(func.sum(Order.total_amount)).filter(func.date(Order.created_at) == target_date).filter(Order.order_status == 'completed').scalar() or 0
+            # Tối ưu hóa so sánh ngày để tương thích PostgreSQL/Internet
+            start_of_day = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+            end_of_day = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=timezone.utc)
+            
+            daily_rev = db.session.query(func.sum(Order.total_amount))\
+                .filter(Order.created_at >= start_of_day)\
+                .filter(Order.created_at <= end_of_day)\
+                .filter(Order.order_status == 'completed').scalar() or 0
             daily_stats.append({"date": target_date.strftime("%d/%m"), "revenue": daily_rev})
+            
         return jsonify({"total_revenue": total_revenue, "total_orders": total_orders, "status_counts": status_counts, "daily_stats": daily_stats}), 200
     except Exception as e:
-        return jsonify(message=str(e)), 500
+        return jsonify(message="Lỗi hệ thống khi tải báo cáo"), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
